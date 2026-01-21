@@ -123,6 +123,10 @@ func testChannel(channel *model.Channel, testModel string, endpointType string) 
 			requestPath = "/v1/images/generations"
 			endpointType = string(constant.EndpointTypeImageGeneration)
 		}
+		if strings.Contains(modelName, "kwai-kolors") && !strings.Contains(modelName, "edit") {
+			requestPath = "/v1/images/generations"
+			endpointType = string(constant.EndpointTypeImageGeneration)
+		}
 		// Response 模型
 		if strings.Contains(modelName, "gpt-5.2") {
 			requestPath = "/v1/responses"
