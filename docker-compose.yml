@@ -1,10 +1,16 @@
 # New-API Docker Compose Configuration
-# 
+#
 # Quick Start:
 #   1. docker-compose up -d
 #   2. New API: http://localhost:3000
 #   3. Hydra Public: http://localhost:4444
 #   4. Hydra Admin: http://localhost:4445
+#
+# Using MySQL instead of PostgreSQL:
+#   1. Comment out the postgres service and SQL_DSN line below
+#   2. Uncomment the mysql service and SQL_DSN
+#   3. Uncomment mysql in depends_on
+#   4. Uncomment mysql_data in volumes section
 #
 # ⚠️  IMPORTANT: Change all default passwords before deploying to production!
 
@@ -23,10 +29,17 @@ services:
       - ./logs:/app/logs
     environment:
       - SQL_DSN=postgresql://root:123456@postgres:5432/new-api # ⚠️ IMPORTANT: Change the password in production!
+#      - SQL_DSN=root:123456@tcp(mysql:3306)/new-api  # Point to the mysql service, uncomment if using MySQL
       - REDIS_CONN_STRING=redis://redis
       - TZ=Asia/Shanghai
       - ERROR_LOG_ENABLED=true # 是否启用错误日志记录 (Whether to enable error log recording)
       - BATCH_UPDATE_ENABLED=true  # 是否启用批量更新 (Whether to enable batch update)
+#      - STREAMING_TIMEOUT=300  # 流模式无响应超时时间，单位秒，默认120秒，如果出现空补全可以尝试改为更大值 （Streaming timeout in seconds, default is 120s. Increase if experiencing empty completions）
+#      - SESSION_SECRET=random_string  # 多机部署时设置，必须修改这个随机字符串！！ （multi-node deployment, set this to a random string!!!!!!!）
+#      - SYNC_FREQUENCY=60  # Uncomment if regular database syncing is needed
+#      - GOOGLE_ANALYTICS_ID=G-XXXXXXXXXX  # Google Analytics 的测量 ID (Google Analytics Measurement ID)
+#      - UMAMI_WEBSITE_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx  # Umami 网站 ID (Umami Website ID)
+#      - UMAMI_SCRIPT_URL=https://analytics.umami.is/script.js  # Umami 脚本 URL，默认为官方地址 (Umami Script URL, defaults to official URL)
       # Hydra OAuth Provider 配置（new-api 作为 Login/Consent Provider）
       - HYDRA_ENABLED=true
       - HYDRA_ADMIN_URL=http://hydra:4445
@@ -36,6 +49,7 @@ services:
       - postgres
       - hydra
       - hydra-db
+#      - mysql  # Uncomment if using MySQL
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O - http://localhost:3000/api/status | grep -o '\"success\":\\s*true' || exit 1"]
       interval: 30s
@@ -57,8 +71,10 @@ services:
       POSTGRES_DB: new-api
     volumes:
       - pg_data:/var/lib/postgresql/data
+#    ports:
+#      - "5432:5432"  # Uncomment if you need to access PostgreSQL from outside Docker
 
-  # ⭐ 新增：Hydra 数据库服务
+  # Hydra 数据库服务
   hydra-db:
     image: postgres:15-alpine
     container_name: hydra-db
@@ -70,7 +86,7 @@ services:
     volumes:
       - hydra_db_data:/var/lib/postgresql/data
 
-  # ⭐ 新增：Hydra OAuth2 服务
+  # Hydra OAuth2 服务
   hydra:
     image: oryd/hydra:v25.4.0
     container_name: hydra
@@ -97,6 +113,19 @@ services:
     depends_on:
       - hydra-db
 
+#  mysql:
+#    image: mysql:8.2
+#    container_name: mysql
+#    restart: always
+#    environment:
+#      MYSQL_ROOT_PASSWORD: 123456  # ⚠️ IMPORTANT: Change this password in production!
+#      MYSQL_DATABASE: new-api
+#    volumes:
+#      - mysql_data:/var/lib/mysql
+#    ports:
+#      - "3306:3306"  # Uncomment if you need to access MySQL from outside Docker
+
 volumes:
   pg_data:
   hydra_db_data:
+#  mysql_data:
