@@ -96,6 +96,11 @@ var TurnstileSecretKey = ""
 var TelegramBotToken = ""
 var TelegramBotName = ""
 
+// Hydra OAuth Provider configuration
+var HydraEnabled = false
+var HydraAdminURL = ""
+var HydraTrustedClients = []string{} // Clients that get auto-consent (e.g., "new-api-web,new-api-admin")
+
 var QuotaForNewUser = 0
 var QuotaForInviter = 0
 var QuotaForInvitee = 0

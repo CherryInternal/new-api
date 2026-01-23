@@ -448,6 +448,22 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.StreamCacheQueueLength, _ = strconv.Atoi(value)
 	case "PayMethods":
 		err = operation_setting.UpdatePayMethodsByJsonString(value)
+	case "HydraEnabled":
+		common.HydraEnabled = value == "true"
+	case "HydraAdminURL":
+		common.HydraAdminURL = value
+	case "HydraTrustedClients":
+		if value == "" {
+			common.HydraTrustedClients = []string{}
+		} else {
+			clients := strings.Split(value, ",")
+			common.HydraTrustedClients = make([]string, 0, len(clients))
+			for _, c := range clients {
+				if trimmed := strings.TrimSpace(c); trimmed != "" {
+					common.HydraTrustedClients = append(common.HydraTrustedClients, trimmed)
+				}
+			}
+		}
 	}
 	return err
 }
