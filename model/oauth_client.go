@@ -89,3 +89,16 @@ func IsOAuthClientOwner(hydraClientID string, userID int) (bool, error) {
 	}
 	return count > 0, nil
 }
+
+// UpdateOAuthClientByHydraID updates an OAuth client by its Hydra client ID
+func UpdateOAuthClientByHydraID(hydraClientID, clientName, allowedScopes, redirectURIs string) error {
+	result := DB.Model(&OAuthClient{}).Where("hydra_client_id = ?", hydraClientID).Updates(map[string]interface{}{
+		"client_name":    clientName,
+		"allowed_scopes": allowedScopes,
+		"redirect_uris":  redirectURIs,
+	})
+	if result.RowsAffected == 0 {
+		return errors.New("client not found")
+	}
+	return result.Error
+}

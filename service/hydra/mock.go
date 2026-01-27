@@ -39,6 +39,7 @@ type MockProvider struct {
 	RejectLogoutErr       error
 	IntrospectTokenErr    error
 	CreateOAuth2ClientErr error
+	UpdateOAuth2ClientErr error
 	ListOAuth2ClientsErr  error
 	DeleteOAuth2ClientErr error
 
@@ -313,6 +314,31 @@ func (m *MockProvider) CreateOAuth2Client(ctx context.Context, clientID, clientS
 	return c, nil
 }
 
+// UpdateOAuth2Client updates a mock OAuth2 client
+func (m *MockProvider) UpdateOAuth2Client(ctx context.Context, clientID, clientName string, grantTypes, responseTypes, redirectURIs []string, scope, tokenEndpointAuthMethod string) (*client.OAuth2Client, error) {
+	if m.UpdateOAuth2ClientErr != nil {
+		return nil, m.UpdateOAuth2ClientErr
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	c, exists := m.OAuth2Clients[clientID]
+	if !exists {
+		return nil, fmt.Errorf("client not found: %s", clientID)
+	}
+
+	c.SetClientName(clientName)
+	c.SetGrantTypes(grantTypes)
+	c.SetResponseTypes(responseTypes)
+	c.SetRedirectUris(redirectURIs)
+	c.SetScope(scope)
+	c.SetTokenEndpointAuthMethod(tokenEndpointAuthMethod)
+
+	m.OAuth2Clients[clientID] = c
+	return c, nil
+}
+
 // ListOAuth2Clients lists all mock OAuth2 clients
 func (m *MockProvider) ListOAuth2Clients(ctx context.Context) ([]client.OAuth2Client, error) {
 	if m.ListOAuth2ClientsErr != nil {
@@ -373,6 +399,7 @@ func (m *MockProvider) Reset() {
 	m.RejectLogoutErr = nil
 	m.IntrospectTokenErr = nil
 	m.CreateOAuth2ClientErr = nil
+	m.UpdateOAuth2ClientErr = nil
 	m.ListOAuth2ClientsErr = nil
 	m.DeleteOAuth2ClientErr = nil
 }

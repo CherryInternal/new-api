@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -38,7 +39,35 @@ func setupTestRouter(mock *hydra.MockProvider) *gin.Engine {
 	// OAuth logout routes
 	r.GET("/oauth/logout", ctrl.OAuthLogout)
 
+	// Test helper to set session cookie
+	r.GET("/_test/set-session", func(c *gin.Context) {
+		idParam := c.Query("id")
+		if idParam == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false})
+			return
+		}
+		id, err := strconv.Atoi(idParam)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false})
+			return
+		}
+		session := sessions.Default(c)
+		session.Set("id", id)
+		if err := session.Save(); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"success": false})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"success": true})
+	})
+
 	return r
+}
+
+func setSessionCookie(router *gin.Engine, userID string) string {
+	req, _ := http.NewRequest("GET", "/_test/set-session?id="+userID, nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	return w.Header().Get("Set-Cookie")
 }
 
 func TestOAuthLogin_MissingChallenge(t *testing.T) {
@@ -84,16 +113,16 @@ func TestOAuthLogin_InvalidChallenge(t *testing.T) {
 
 func TestOAuthLogin_SkipTrue(t *testing.T) {
 	mock := hydra.NewMockProvider()
-	mock.SetLoginRequest("skip-challenge", "test-client", "Test App", []string{"openid"}, true, "user-123")
+	mock.SetLoginRequest("skip-challenge", "test-client", "Test App", []string{"openid"}, true, "123")
 	router := setupTestRouter(mock)
 
 	req, _ := http.NewRequest("GET", "/oauth/login?login_challenge=skip-challenge", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	// Should redirect when skip=true
-	if w.Code != http.StatusFound {
-		t.Errorf("Expected status %d (redirect), got %d", http.StatusFound, w.Code)
+	// Should return redirect info when skip=true
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, w.Code)
 	}
 
 	// Check that login was accepted
@@ -133,7 +162,7 @@ func TestOAuthLogin_ShowLoginPage(t *testing.T) {
 
 func TestOAuthLogin_HydraError(t *testing.T) {
 	mock := hydra.NewMockProvider()
-	mock.SetLoginRequest("error-challenge", "test-client", "Test App", []string{"openid"}, true, "user-123")
+	mock.SetLoginRequest("error-challenge", "test-client", "Test App", []string{"openid"}, true, "123")
 	mock.AcceptLoginErr = http.ErrAbortHandler
 	router := setupTestRouter(mock)
 
@@ -223,18 +252,58 @@ func TestOAuthConsent_InvalidChallenge(t *testing.T) {
 	}
 }
 
-func TestOAuthConsent_SkipTrue(t *testing.T) {
+func TestOAuthConsent_RequiresSession(t *testing.T) {
 	mock := hydra.NewMockProvider()
-	mock.SetConsentRequest("skip-consent", "test-client", "Test App", "user-123", []string{"openid"}, true)
+	mock.SetConsentRequest("consent-no-session", "third-party-app", "Third Party", "123", []string{"openid"}, false)
 	router := setupTestRouter(mock)
 
-	req, _ := http.NewRequest("GET", "/oauth/consent?consent_challenge=skip-consent", nil)
+	req, _ := http.NewRequest("GET", "/oauth/consent?consent_challenge=consent-no-session", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	// Should redirect when skip=true
-	if w.Code != http.StatusFound {
-		t.Errorf("Expected status %d (redirect), got %d", http.StatusFound, w.Code)
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	if mock.RejectedConsents["consent-no-session"] != "login_required" {
+		t.Error("Consent should have been rejected with login_required")
+	}
+}
+
+func TestOAuthConsent_SessionMismatch(t *testing.T) {
+	mock := hydra.NewMockProvider()
+	mock.SetConsentRequest("consent-mismatch", "third-party-app", "Third Party", "123", []string{"openid"}, false)
+	router := setupTestRouter(mock)
+	cookie := setSessionCookie(router, "456")
+
+	req, _ := http.NewRequest("GET", "/oauth/consent?consent_challenge=consent-mismatch", nil)
+	req.Header.Set("Cookie", cookie)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	if mock.RejectedConsents["consent-mismatch"] != "login_required" {
+		t.Error("Consent should have been rejected with login_required")
+	}
+}
+
+func TestOAuthConsent_SkipTrue(t *testing.T) {
+	mock := hydra.NewMockProvider()
+	mock.SetConsentRequest("skip-consent", "test-client", "Test App", "123", []string{"openid"}, true)
+	router := setupTestRouter(mock)
+	cookie := setSessionCookie(router, "123")
+
+	req, _ := http.NewRequest("GET", "/oauth/consent?consent_challenge=skip-consent", nil)
+	req.Header.Set("Cookie", cookie)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	// Should return redirect info when skip=true
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, w.Code)
 	}
 
 	// Check that consent was accepted
@@ -251,16 +320,18 @@ func TestOAuthConsent_TrustedClient(t *testing.T) {
 
 	mock := hydra.NewMockProvider()
 	// "new-api-web" is a trusted client
-	mock.SetConsentRequest("trusted-consent", "new-api-web", "Web App", "user-123", []string{"openid", "profile"}, false)
+	mock.SetConsentRequest("trusted-consent", "new-api-web", "Web App", "123", []string{"openid", "profile"}, false)
 	router := setupTestRouter(mock)
+	cookie := setSessionCookie(router, "123")
 
 	req, _ := http.NewRequest("GET", "/oauth/consent?consent_challenge=trusted-consent", nil)
+	req.Header.Set("Cookie", cookie)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	// Should redirect for trusted client (auto-consent)
-	if w.Code != http.StatusFound {
-		t.Errorf("Expected status %d (redirect), got %d", http.StatusFound, w.Code)
+	// Should return redirect info for trusted client (auto-consent)
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, w.Code)
 	}
 
 	// Check that consent was accepted
@@ -271,10 +342,12 @@ func TestOAuthConsent_TrustedClient(t *testing.T) {
 
 func TestOAuthConsent_ShowConsentPage(t *testing.T) {
 	mock := hydra.NewMockProvider()
-	mock.SetConsentRequest("consent-challenge", "third-party-app", "Third Party", "user-123", []string{"openid", "profile", "email"}, false)
+	mock.SetConsentRequest("consent-challenge", "third-party-app", "Third Party", "123", []string{"openid", "profile", "email"}, false)
 	router := setupTestRouter(mock)
+	cookie := setSessionCookie(router, "123")
 
 	req, _ := http.NewRequest("GET", "/oauth/consent?consent_challenge=consent-challenge", nil)
+	req.Header.Set("Cookie", cookie)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -322,16 +395,18 @@ func TestOAuthConsentSubmit_MissingChallenge(t *testing.T) {
 
 func TestOAuthConsentSubmit_Success(t *testing.T) {
 	mock := hydra.NewMockProvider()
-	mock.SetConsentRequest("consent-submit", "test-client", "Test App", "user-123", []string{"openid", "profile"}, false)
+	mock.SetConsentRequest("consent-submit", "test-client", "Test App", "123", []string{"openid", "profile"}, false)
 	router := setupTestRouter(mock)
+	cookie := setSessionCookie(router, "123")
 
 	form := url.Values{}
-	form.Set("challenge", "consent-submit")
+	form.Set("consent_challenge", "consent-submit")
 	form.Add("grant_scope", "openid")
 	form.Add("grant_scope", "profile")
 	form.Set("remember", "true")
 	req, _ := http.NewRequest("POST", "/oauth/consent", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Cookie", cookie)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -356,6 +431,31 @@ func TestOAuthConsentSubmit_Success(t *testing.T) {
 	}
 }
 
+func TestOAuthConsentSubmit_RequiresSession(t *testing.T) {
+	mock := hydra.NewMockProvider()
+	mock.SetConsentRequest("consent-submit-no-session", "test-client", "Test App", "123", []string{"openid"}, false)
+	router := setupTestRouter(mock)
+
+	form := url.Values{}
+	form.Set("consent_challenge", "consent-submit-no-session")
+	form.Add("grant_scope", "openid")
+	req, _ := http.NewRequest("POST", "/oauth/consent", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	if mock.RejectedConsents["consent-submit-no-session"] != "login_required" {
+		t.Error("Consent submit should have been rejected with login_required")
+	}
+	if _, ok := mock.AcceptedConsents["consent-submit-no-session"]; ok {
+		t.Error("Consent submit should not be accepted without session")
+	}
+}
+
 func TestOAuthConsentReject_MissingChallenge(t *testing.T) {
 	mock := hydra.NewMockProvider()
 	router := setupTestRouter(mock)
@@ -373,13 +473,15 @@ func TestOAuthConsentReject_MissingChallenge(t *testing.T) {
 
 func TestOAuthConsentReject_Success(t *testing.T) {
 	mock := hydra.NewMockProvider()
-	mock.SetConsentRequest("reject-consent", "test-client", "Test App", "user-123", []string{"openid"}, false)
+	mock.SetConsentRequest("reject-consent", "test-client", "Test App", "123", []string{"openid"}, false)
 	router := setupTestRouter(mock)
+	cookie := setSessionCookie(router, "123")
 
 	form := url.Values{}
-	form.Set("challenge", "reject-consent")
+	form.Set("consent_challenge", "reject-consent")
 	req, _ := http.NewRequest("POST", "/oauth/consent/reject", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Cookie", cookie)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -390,6 +492,27 @@ func TestOAuthConsentReject_Success(t *testing.T) {
 	// Check that consent was rejected
 	if _, ok := mock.RejectedConsents["reject-consent"]; !ok {
 		t.Error("Consent should have been rejected")
+	}
+}
+
+func TestOAuthConsentReject_RequiresSession(t *testing.T) {
+	mock := hydra.NewMockProvider()
+	mock.SetConsentRequest("reject-no-session", "test-client", "Test App", "123", []string{"openid"}, false)
+	router := setupTestRouter(mock)
+
+	form := url.Values{}
+	form.Set("consent_challenge", "reject-no-session")
+	req, _ := http.NewRequest("POST", "/oauth/consent/reject", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	if mock.RejectedConsents["reject-no-session"] != "login_required" {
+		t.Error("Consent reject should have been rejected with login_required")
 	}
 }
 
@@ -427,16 +550,16 @@ func TestOAuthLogout_InvalidChallenge(t *testing.T) {
 
 func TestOAuthLogout_Success(t *testing.T) {
 	mock := hydra.NewMockProvider()
-	mock.SetLogoutRequest("logout-challenge", "user-123", "session-456")
+	mock.SetLogoutRequest("logout-challenge", "123", "session-456")
 	router := setupTestRouter(mock)
 
 	req, _ := http.NewRequest("GET", "/oauth/logout?logout_challenge=logout-challenge", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	// Should redirect after accepting logout
-	if w.Code != http.StatusFound {
-		t.Errorf("Expected status %d (redirect), got %d", http.StatusFound, w.Code)
+	// Should return redirect info after accepting logout
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, w.Code)
 	}
 
 	// Check that logout was accepted

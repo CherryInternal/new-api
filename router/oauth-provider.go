@@ -20,38 +20,39 @@ func SetOAuthProviderRouter(router *gin.Engine) {
 	hydraService := hydra.NewService(common.HydraAdminURL)
 	ctrl := controller.NewOAuthProviderController(hydraService)
 
-	// OAuth provider routes (called by Hydra)
-	oauthRoute := router.Group("/oauth")
-	oauthRoute.Use(middleware.GlobalAPIRateLimit())
+	// OAuth provider API routes (for frontend to fetch data)
+	oauthAPI := router.Group("/api/oauth")
+	oauthAPI.Use(middleware.GlobalAPIRateLimit())
 	{
 		// Login flow
-		// GET /oauth/login - Hydra redirects here, shows login page or auto-accepts if session exists
-		oauthRoute.GET("/login", ctrl.OAuthLogin)
-		// POST /oauth/login - User submits login credentials
-		oauthRoute.POST("/login", middleware.CriticalRateLimit(), ctrl.OAuthLoginSubmit)
-		// POST /oauth/login/2fa - User submits 2FA code during OAuth login
-		oauthRoute.POST("/login/2fa", middleware.CriticalRateLimit(), ctrl.OAuthLogin2FA)
+		// GET /api/oauth/login - Get login request info
+		oauthAPI.GET("/login", ctrl.OAuthLogin)
+		// POST /api/oauth/login - User submits login credentials
+		oauthAPI.POST("/login", middleware.CriticalRateLimit(), ctrl.OAuthLoginSubmit)
+		// POST /api/oauth/login/2fa - User submits 2FA code during OAuth login
+		oauthAPI.POST("/login/2fa", middleware.CriticalRateLimit(), ctrl.OAuthLogin2FA)
 
 		// Consent flow
-		// GET /oauth/consent - Hydra redirects here, shows consent page or auto-accepts for trusted clients
-		oauthRoute.GET("/consent", ctrl.OAuthConsent)
-		// POST /oauth/consent - User grants consent with selected scopes
-		oauthRoute.POST("/consent", ctrl.OAuthConsentSubmit)
-		// POST /oauth/consent/reject - User rejects consent
-		oauthRoute.POST("/consent/reject", ctrl.OAuthConsentReject)
+		// GET /api/oauth/consent - Get consent request info
+		oauthAPI.GET("/consent", ctrl.OAuthConsent)
+		// POST /api/oauth/consent - User grants consent with selected scopes
+		oauthAPI.POST("/consent", ctrl.OAuthConsentSubmit)
+		// POST /api/oauth/consent/reject - User rejects consent
+		oauthAPI.POST("/consent/reject", ctrl.OAuthConsentReject)
 
 		// Logout flow
-		// GET /oauth/logout - Hydra redirects here, handles logout
-		oauthRoute.GET("/logout", ctrl.OAuthLogout)
+		// GET /api/oauth/logout - Handle logout
+		oauthAPI.GET("/logout", ctrl.OAuthLogout)
 	}
 
 	// Admin client management routes (requires admin auth)
-	adminClients := router.Group("/oauth/admin/clients")
+	adminClients := router.Group("/api/oauth/admin/clients")
 	adminClients.Use(middleware.GlobalAPIRateLimit())
 	adminClients.Use(middleware.AdminAuth())
 	{
 		adminClients.GET("", ctrl.OAuthListClients)
 		adminClients.POST("", ctrl.OAuthRegisterClient)
+		adminClients.PUT("/:id", ctrl.OAuthUpdateClient)
 		adminClients.DELETE("/:id", ctrl.OAuthDeleteClient)
 	}
 }

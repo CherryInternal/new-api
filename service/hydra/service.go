@@ -146,6 +146,23 @@ func (s *Service) CreateOAuth2Client(ctx context.Context, clientID, clientSecret
 	return resp, err
 }
 
+// UpdateOAuth2Client updates an existing OAuth2 client in Hydra
+func (s *Service) UpdateOAuth2Client(ctx context.Context, clientID, clientName string, grantTypes, responseTypes, redirectURIs []string, scope, tokenEndpointAuthMethod string) (*client.OAuth2Client, error) {
+	body := client.NewOAuth2Client()
+	body.SetClientId(clientID)
+	body.SetClientName(clientName)
+	body.SetGrantTypes(grantTypes)
+	body.SetResponseTypes(responseTypes)
+	body.SetRedirectUris(redirectURIs)
+	body.SetScope(scope)
+	body.SetTokenEndpointAuthMethod(tokenEndpointAuthMethod)
+
+	resp, _, err := s.admin.OAuth2API.SetOAuth2Client(ctx, clientID).
+		OAuth2Client(*body).
+		Execute()
+	return resp, err
+}
+
 // ListOAuth2Clients lists all OAuth2 clients in Hydra
 func (s *Service) ListOAuth2Clients(ctx context.Context) ([]client.OAuth2Client, error) {
 	resp, _, err := s.admin.OAuth2API.ListOAuth2Clients(ctx).Execute()

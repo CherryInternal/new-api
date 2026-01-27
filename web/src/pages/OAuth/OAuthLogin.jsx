@@ -64,7 +64,7 @@ const OAuthLogin = () => {
 
     const fetchClientInfo = async () => {
       try {
-        const res = await API.get(`/oauth/login?login_challenge=${challenge}`);
+        const res = await API.get(`/api/oauth/login?login_challenge=${challenge}`);
         const { success, message, data } = res.data;
 
         if (success) {
@@ -97,7 +97,7 @@ const OAuthLogin = () => {
 
     setSubmitting(true);
     try {
-      const res = await API.post('/oauth/login', {
+      const res = await API.post('/api/oauth/login', {
         login_challenge: challenge,
         username,
         password,
@@ -131,7 +131,7 @@ const OAuthLogin = () => {
 
     setSubmitting(true);
     try {
-      const res = await API.post('/oauth/login/2fa', {
+      const res = await API.post('/api/oauth/login/2fa', {
         login_challenge: challenge,
         code: twoFACode,
       });

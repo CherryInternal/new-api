@@ -136,6 +136,7 @@ func OAuthListTokens(c *gin.Context) {
 		safeTokens = append(safeTokens, gin.H{
 			"id":              t.Id,
 			"name":            t.Name,
+			"key":             t.Key,
 			"status":          t.Status,
 			"created_time":    t.CreatedTime,
 			"expired_time":    t.ExpiredTime,

@@ -1,0 +1,72 @@
+# Local Development Docker Compose
+
+services:
+  new-api:
+    image: jeuneastre/new-api:test
+    container_name: new-api
+    restart: always
+    ports:
+      - "3000:3000"
+    command: --log-dir /app/logs
+    volumes:
+      - ./data:/data
+      - ./logs:/app/logs
+    depends_on:
+      - hydra
+      - newapi-postgres
+      - newapi-redis
+    environment:
+      - PORT=3000
+      - SQL_DSN=postgres://hydra:hydra@newapi-postgres:5432/newapi?sslmode=disable
+      - REDIS_CONN_STRING=redis://newapi-redis:6379
+      - SESSION_SECRET=your-session-secret-at-least-32-chars
+      - SYNC_FREQUENCY=60
+      - FRONTEND_BASE_URL=http://39.105.14.191:3000
+      - HYDRA_ENABLED=true
+      - HYDRA_ADMIN_URL=http://hydra:4445
+
+  hydra:
+    image: oryd/hydra:v2.2.0
+    container_name: hydra
+    restart: always
+    ports:
+      - "4444:4444"
+      - "4445:4445"
+    depends_on:
+      - newapi-postgres
+    environment:
+      - DSN=postgres://hydra:hydra@newapi-postgres:5432/hydra?sslmode=disable
+      - SECRETS_SYSTEM=your-hydra-secret-at-least-32-characters-long
+      - OIDC_SUBJECT_IDENTIFIERS_SUPPORTED_TYPES=public,pairwise
+      - OIDC_SUBJECT_IDENTIFIERS_PAIRWISE_SALT=random-salt-string
+      - URLS_SELF_ISSUER=http://39.105.14.191:4444/
+      - URLS_SELF_PUBLIC=http://39.105.14.191:4444/
+      - URLS_LOGIN=http://39.105.14.191:3000/oauth/login
+      - URLS_CONSENT=http://39.105.14.191:3000/oauth/consent
+      - URLS_LOGOUT=http://39.105.14.191:3000/oauth/logout
+      - LOG_LEAK_SENSITIVE_VALUES=true
+      - LOG_LEVEL=debug
+    entrypoint: ["sh", "-c", "hydra migrate sql -e --yes && hydra serve all --dev"]
+
+  newapi-postgres:
+    image: postgres:15-alpine
+    container_name: newapi-postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=hydra
+      - POSTGRES_PASSWORD=hydra
+      - POSTGRES_DB=hydra
+    volumes:
+      - newapi_postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+
+  newapi-redis:
+    image: redis:7-alpine
+    container_name: newapi-redis
+    restart: always
+    volumes:
+      - newapi_redis_data:/data
+
+volumes:
+  newapi_postgres_data:
+  newapi_redis_data:

@@ -31,6 +31,9 @@ type Provider interface {
 	CreateOAuth2Client(ctx context.Context, clientID, clientSecret, clientName string,
 		grantTypes, responseTypes, redirectURIs []string,
 		scope, tokenEndpointAuthMethod string) (*client.OAuth2Client, error)
+	UpdateOAuth2Client(ctx context.Context, clientID, clientName string,
+		grantTypes, responseTypes, redirectURIs []string,
+		scope, tokenEndpointAuthMethod string) (*client.OAuth2Client, error)
 	ListOAuth2Clients(ctx context.Context) ([]client.OAuth2Client, error)
 	DeleteOAuth2Client(ctx context.Context, clientID string) error
 }

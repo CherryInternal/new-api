@@ -93,11 +93,38 @@ const OAuthConsent = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [consentInfo, setConsentInfo] = useState(null);
+  const [redirectComplete, setRedirectComplete] = useState(false);
+  const [redirectTarget, setRedirectTarget] = useState('');
 
   const logo = getLogo();
   const systemName = getSystemName();
   const challenge = searchParams.get('consent_challenge');
   const isEnglish = i18n.language === 'en';
+
+  // Check if URL is a custom URI scheme (not http/https)
+  const isCustomScheme = (url) => {
+    if (!url) return false;
+    try {
+      const parsed = new URL(url);
+      return !['http:', 'https:'].includes(parsed.protocol);
+    } catch {
+      return false;
+    }
+  };
+
+  // Handle redirect - for custom URI schemes, show completion message
+  const handleRedirect = (redirectTo) => {
+    setRedirectTarget(redirectTo || '');
+    setRedirectComplete(true);
+    if (isCustomScheme(redirectTo)) {
+      window.location.href = redirectTo;
+      return;
+    }
+    const newWindow = window.open(redirectTo, '_blank', 'noopener,noreferrer');
+    if (!newWindow) {
+      window.location.assign(redirectTo);
+    }
+  };
 
   // Fetch consent info on mount
   useEffect(() => {
@@ -109,21 +136,27 @@ const OAuthConsent = () => {
 
     const fetchConsentInfo = async () => {
       try {
-        const res = await API.get(`/oauth/consent?consent_challenge=${challenge}`);
-        const { success, message, data } = res.data;
+        const res = await API.get(`/api/oauth/consent?consent_challenge=${challenge}`);
+        const { success, message, data } = res.data || {};
+
+        // Check if we need to redirect (already consented or not logged in)
+        if (data?.redirect_to) {
+          handleRedirect(data.redirect_to);
+          return;
+        }
 
         if (success) {
-          // Check if we need to redirect (already consented or trusted client)
-          if (data.redirect_to) {
-            window.location.href = data.redirect_to;
-            return;
-          }
           setConsentInfo(data);
         } else {
-          setError(message || t('获取授权信息失败'));
+          setError(message || t('授权会话已过期，请重新发起授权'));
         }
       } catch (err) {
         console.error('Failed to fetch consent info:', err);
+        const redirectTo = err?.response?.data?.data?.redirect_to;
+        if (redirectTo) {
+          handleRedirect(redirectTo);
+          return;
+        }
         setError(t('获取授权信息失败'));
       } finally {
         setLoading(false);
@@ -137,17 +170,20 @@ const OAuthConsent = () => {
   const handleApprove = async () => {
     setSubmitting(true);
     try {
-      const res = await API.post('/oauth/consent', {
+      const res = await API.post('/api/oauth/consent', {
         consent_challenge: challenge,
         grant_scope: consentInfo?.requested_scope || [],
         remember: true,
       });
 
-      const { success, message, data } = res.data;
+      const { success, message, data } = res.data || {};
 
-      if (success && data.redirect_to) {
-        window.location.href = data.redirect_to;
-      } else {
+      if (data?.redirect_to) {
+        handleRedirect(data.redirect_to);
+        return;
+      }
+
+      if (!success) {
         showError(message || t('授权失败'));
       }
     } catch (err) {
@@ -162,15 +198,18 @@ const OAuthConsent = () => {
   const handleReject = async () => {
     setSubmitting(true);
     try {
-      const res = await API.post('/oauth/consent/reject', {
+      const res = await API.post('/api/oauth/consent/reject', {
         consent_challenge: challenge,
       });
 
-      const { success, message, data } = res.data;
+      const { success, message, data } = res.data || {};
 
-      if (success && data.redirect_to) {
-        window.location.href = data.redirect_to;
-      } else {
+      if (data?.redirect_to) {
+        handleRedirect(data.redirect_to);
+        return;
+      }
+
+      if (!success) {
         showError(message || t('操作失败'));
       }
     } catch (err) {
@@ -221,6 +260,45 @@ const OAuthConsent = () => {
             <Text>{error}</Text>
           </div>
         </Card>
+      </div>
+    );
+  }
+
+  // Render redirect complete state
+  if (redirectComplete) {
+    return (
+      <div className='relative overflow-hidden bg-gray-100 flex items-center justify-center min-h-screen py-12 px-4'>
+        <div className='blur-ball blur-ball-indigo' style={{ top: '-80px', right: '-80px' }} />
+        <div className='blur-ball blur-ball-teal' style={{ top: '50%', left: '-120px' }} />
+
+        <div className='w-full max-w-md'>
+          <div className='flex items-center justify-center mb-6 gap-2'>
+            <img src={logo} alt='Logo' className='h-10 rounded-full' />
+            <Title heading={3}>{systemName}</Title>
+          </div>
+
+          <Card className='border-0 !rounded-2xl overflow-hidden'>
+            <div className='flex flex-col items-center py-12 px-6'>
+              <IconTickCircle className='text-green-500 mb-4' size='extra-large' />
+              <Title heading={4} className='text-gray-800 dark:text-gray-200 mb-2'>
+                {t('授权完成')}
+              </Title>
+              <Text className='text-gray-500 text-center'>
+                {t('已发起跳转，请返回应用完成登录')}
+              </Text>
+              {redirectTarget && (
+                <Button
+                  theme='solid'
+                  type='primary'
+                  className='!rounded-full mt-6'
+                  onClick={() => window.location.assign(redirectTarget)}
+                >
+                  {t('如果未自动跳转，请点击继续')}
+                </Button>
+              )}
+            </div>
+          </Card>
+        </div>
       </div>
     );
   }

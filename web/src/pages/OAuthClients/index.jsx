@@ -18,14 +18,14 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React from 'react';
-import OAuthTestComponent from '../../components/oauth-test';
+import OAuthClientsTable from '../../components/table/oauth-clients';
 
-const OAuthTest = () => {
+const OAuthClients = () => {
   return (
     <div className='mt-[60px] px-2'>
-      <OAuthTestComponent />
+      <OAuthClientsTable />
     </div>
   );
 };
 
-export default OAuthTest;
+export default OAuthClients;
