@@ -107,7 +107,6 @@ func InitEnv() {
 	HydraEnabled = GetEnvOrDefaultBool("HYDRA_ENABLED", false)
 	HydraAdminURL = GetEnvOrDefaultString("HYDRA_ADMIN_URL", "")
 	HydraPublicURL = GetEnvOrDefaultString("HYDRA_PUBLIC_URL", "http://127.0.0.1:4444")
-	HydraBaseHost = GetEnvOrDefaultString("HYDRA_BASE_HOST", "") // e.g., "open.cherryin.ai" for multi-domain URL rewriting
 	if trustedClients := GetEnvOrDefaultString("HYDRA_TRUSTED_CLIENTS", ""); trustedClients != "" {
 		for _, c := range strings.Split(trustedClients, ",") {
 			if trimmed := strings.TrimSpace(c); trimmed != "" {
