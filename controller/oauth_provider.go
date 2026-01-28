@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -14,6 +15,32 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
+
+// rewriteOAuthRedirect rewrites Hydra redirect URLs to use the request's host/scheme
+func rewriteOAuthRedirect(c *gin.Context, redirectURL string) string {
+	if redirectURL == "" {
+		return redirectURL
+	}
+
+	parsed, err := url.Parse(redirectURL)
+	if err != nil {
+		return redirectURL
+	}
+
+	// Get request scheme
+	scheme := "http"
+	if proto := c.Request.Header.Get("X-Forwarded-Proto"); proto != "" {
+		scheme = strings.ToLower(strings.TrimSpace(proto))
+	} else if c.Request.TLS != nil {
+		scheme = "https"
+	}
+
+	// Rewrite host and scheme
+	parsed.Host = c.Request.Host
+	parsed.Scheme = scheme
+
+	return parsed.String()
+}
 
 // OAuthProviderController handles Hydra login/consent/logout flows
 type OAuthProviderController struct {
@@ -80,7 +107,7 @@ func (ctrl *OAuthProviderController) OAuthLogin(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
 			"data": gin.H{
-				"redirect_to": redirect.RedirectTo,
+				"redirect_to": rewriteOAuthRedirect(c, redirect.RedirectTo),
 			},
 		})
 		return
@@ -102,7 +129,7 @@ func (ctrl *OAuthProviderController) OAuthLogin(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
 			"data": gin.H{
-				"redirect_to": redirect.RedirectTo,
+				"redirect_to": rewriteOAuthRedirect(c, redirect.RedirectTo),
 			},
 		})
 		return
@@ -174,7 +201,7 @@ func (ctrl *OAuthProviderController) OAuthLoginSubmit(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"success":     false,
 			"message":     err.Error(),
-			"redirect_to": redirect.RedirectTo,
+			"redirect_to": rewriteOAuthRedirect(c, redirect.RedirectTo),
 		})
 		return
 	}
@@ -225,7 +252,7 @@ func (ctrl *OAuthProviderController) OAuthLoginSubmit(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
-			"redirect_to": redirect.RedirectTo,
+			"redirect_to": rewriteOAuthRedirect(c, redirect.RedirectTo),
 		},
 	})
 }
@@ -325,7 +352,7 @@ func (ctrl *OAuthProviderController) OAuthLogin2FA(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
-			"redirect_to": redirect.RedirectTo,
+			"redirect_to": rewriteOAuthRedirect(c, redirect.RedirectTo),
 		},
 	})
 }
@@ -364,7 +391,7 @@ func (ctrl *OAuthProviderController) OAuthConsent(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
 			"data": gin.H{
-				"redirect_to": redirect.RedirectTo,
+				"redirect_to": rewriteOAuthRedirect(c, redirect.RedirectTo),
 			},
 		})
 		return
@@ -391,7 +418,7 @@ func (ctrl *OAuthProviderController) OAuthConsent(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
 			"data": gin.H{
-				"redirect_to": redirect.RedirectTo,
+				"redirect_to": rewriteOAuthRedirect(c, redirect.RedirectTo),
 			},
 		})
 		return
@@ -419,7 +446,7 @@ func (ctrl *OAuthProviderController) OAuthConsent(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
 			"data": gin.H{
-				"redirect_to": redirect.RedirectTo,
+				"redirect_to": rewriteOAuthRedirect(c, redirect.RedirectTo),
 			},
 		})
 		return
@@ -487,7 +514,7 @@ func (ctrl *OAuthProviderController) OAuthConsentSubmit(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
 			"data": gin.H{
-				"redirect_to": reject.RedirectTo,
+				"redirect_to": rewriteOAuthRedirect(c, reject.RedirectTo),
 			},
 		})
 		return
@@ -517,7 +544,7 @@ func (ctrl *OAuthProviderController) OAuthConsentSubmit(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
-			"redirect_to": redirect.RedirectTo,
+			"redirect_to": rewriteOAuthRedirect(c, redirect.RedirectTo),
 		},
 	})
 }
@@ -566,7 +593,7 @@ func (ctrl *OAuthProviderController) OAuthConsentReject(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
 			"data": gin.H{
-				"redirect_to": reject.RedirectTo,
+				"redirect_to": rewriteOAuthRedirect(c, reject.RedirectTo),
 			},
 		})
 		return
@@ -584,7 +611,7 @@ func (ctrl *OAuthProviderController) OAuthConsentReject(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
-			"redirect_to": redirect.RedirectTo,
+			"redirect_to": rewriteOAuthRedirect(c, redirect.RedirectTo),
 		},
 	})
 }
@@ -630,7 +657,7 @@ func (ctrl *OAuthProviderController) OAuthLogout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
-			"redirect_to": redirect.RedirectTo,
+			"redirect_to": rewriteOAuthRedirect(c, redirect.RedirectTo),
 		},
 	})
 }
