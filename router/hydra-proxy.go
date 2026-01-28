@@ -60,10 +60,12 @@ func createHydraProxy(target *url.URL, requestHost, requestScheme string) *httpu
 
 	// If HYDRA_BASE_HOST is configured, rewrite redirect URLs to use the current request's host
 	baseHost := strings.TrimSpace(common.HydraBaseHost)
-	if baseHost != "" && requestHost != "" && requestHost != baseHost {
+	if baseHost != "" && requestHost != "" && !hostMatches(requestHost, baseHost) {
 		proxy.ModifyResponse = func(resp *http.Response) error {
-			return rewriteRedirectLocation(resp, baseHost, requestHost)
+			return rewriteRedirectLocation(resp, baseHost, requestHost, requestScheme)
 		}
+	} else if baseHost == "" {
+		common.SysLog("HYDRA_BASE_HOST is not configured, URL rewriting disabled")
 	}
 
 	return proxy
@@ -130,7 +132,7 @@ func parseCFVisitorScheme(cfVisitor string) string {
 
 // rewriteRedirectLocation rewrites the Location header in redirect responses
 // to replace the base host with the current request's host.
-func rewriteRedirectLocation(resp *http.Response, baseHost, requestHost string) error {
+func rewriteRedirectLocation(resp *http.Response, baseHost, requestHost, requestScheme string) error {
 	// Only process redirect responses
 	if resp.StatusCode < 300 || resp.StatusCode >= 400 {
 		return nil
@@ -158,15 +160,18 @@ func rewriteRedirectLocation(resp *http.Response, baseHost, requestHost string) 
 	baseHostWithoutPort := stripPort(baseHost)
 
 	if locHostWithoutPort == baseHostWithoutPort {
+		oldLocation := location
 		// Rewrite the host to the request host
 		locURL.Host = requestHost
 
-		// Determine scheme based on request (assume HTTPS for production)
-		if !strings.HasPrefix(requestHost, "localhost") && !strings.HasPrefix(requestHost, "127.0.0.1") {
-			locURL.Scheme = "https"
+		// Use the actual request scheme
+		if requestScheme != "" {
+			locURL.Scheme = requestScheme
 		}
 
-		resp.Header.Set("Location", locURL.String())
+		newLocation := locURL.String()
+		resp.Header.Set("Location", newLocation)
+		common.SysLog(fmt.Sprintf("hydra proxy rewrite: %s -> %s (scheme=%s)", oldLocation, newLocation, requestScheme))
 	}
 
 	return nil
@@ -186,4 +191,9 @@ func stripPort(host string) string {
 		}
 	}
 	return host
+}
+
+// hostMatches checks if two hosts are the same (ignoring port).
+func hostMatches(host1, host2 string) bool {
+	return stripPort(host1) == stripPort(host2)
 }
