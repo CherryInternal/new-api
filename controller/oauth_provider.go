@@ -134,18 +134,60 @@ func (ctrl *OAuthProviderController) OAuthLogin(c *gin.Context) {
 	userID := session.Get("id")
 
 	// If skip is true, Hydra thinks the user is already authenticated
-	// But we need to verify new-api session is also valid
+	// But we need to verify new-api session is also valid AND matches Hydra's subject
 	if loginReq.GetSkip() {
 		if userID != nil {
-			// Both Hydra and new-api agree user is logged in, accept immediately
-			redirect, err := ctrl.hydra.AcceptLogin(c.Request.Context(), challenge, loginReq.GetSubject(), false, 0)
+			sessionUserID, ok := userID.(int)
+			if !ok {
+				// Invalid session data, clear and show login page
+				session.Clear()
+				_ = session.Save()
+			} else {
+				sessionSubject := strconv.Itoa(sessionUserID)
+				// Verify Hydra's subject matches new-api session to prevent identity confusion
+				if loginReq.GetSubject() == sessionSubject {
+					// Both Hydra and new-api agree on the same user, accept immediately
+					redirect, err := ctrl.hydra.AcceptLogin(c.Request.Context(), challenge, sessionSubject, false, 0)
+					if err != nil {
+						c.JSON(http.StatusInternalServerError, gin.H{
+							"success": false,
+							"message": "failed to accept login",
+						})
+						return
+					}
+					c.JSON(http.StatusOK, gin.H{
+						"success": true,
+						"data": gin.H{
+							"redirect_to": rewriteOAuthRedirect(c, redirect.RedirectTo),
+						},
+					})
+					return
+				}
+				// Subject mismatch: Hydra and new-api have different users
+				// This could happen if logout didn't properly revoke Hydra sessions
+				// Don't skip, show login page to re-authenticate
+			}
+		}
+	}
+
+	// Check if user is already logged in via session
+	if userID != nil {
+		sessionUserID, ok := userID.(int)
+		if !ok {
+			// Invalid session data, clear and continue to login page
+			session.Clear()
+			_ = session.Save()
+		} else {
+			subject := strconv.Itoa(sessionUserID)
+			redirect, err := ctrl.hydra.AcceptLogin(c.Request.Context(), challenge, subject, true, common.HydraLoginRememberFor)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{
 					"success": false,
-					"message": "failed to accept login: " + err.Error(),
+					"message": "failed to accept login",
 				})
 				return
 			}
+			// Return JSON for frontend to handle redirect (avoid CORS issues with HTTP redirects)
 			c.JSON(http.StatusOK, gin.H{
 				"success": true,
 				"data": gin.H{
@@ -154,29 +196,6 @@ func (ctrl *OAuthProviderController) OAuthLogin(c *gin.Context) {
 			})
 			return
 		}
-		// Hydra says skip but new-api session is gone (user logged out)
-		// Don't skip, show login page instead
-	}
-
-	// Check if user is already logged in via session
-	if userID != nil {
-		subject := strconv.Itoa(userID.(int))
-		redirect, err := ctrl.hydra.AcceptLogin(c.Request.Context(), challenge, subject, true, common.HydraLoginRememberFor)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"success": false,
-				"message": "failed to accept login: " + err.Error(),
-			})
-			return
-		}
-		// Return JSON for frontend to handle redirect (avoid CORS issues with HTTP redirects)
-		c.JSON(http.StatusOK, gin.H{
-			"success": true,
-			"data": gin.H{
-				"redirect_to": rewriteOAuthRedirect(c, redirect.RedirectTo),
-			},
-		})
-		return
 	}
 
 	// Return login page info for frontend to render
@@ -315,10 +334,10 @@ func (ctrl *OAuthProviderController) OAuthLogin2FA(c *gin.Context) {
 	}
 
 	session := sessions.Default(c)
-	userID := session.Get("oauth_pending_user_id")
-	challenge := session.Get("oauth_pending_challenge")
+	userIDVal := session.Get("oauth_pending_user_id")
+	challengeVal := session.Get("oauth_pending_challenge")
 
-	if userID == nil || challenge == nil {
+	if userIDVal == nil || challengeVal == nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"message": "no pending 2FA verification",
@@ -326,8 +345,26 @@ func (ctrl *OAuthProviderController) OAuthLogin2FA(c *gin.Context) {
 		return
 	}
 
+	// Safe type assertions
+	userID, ok := userIDVal.(int)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "invalid session data",
+		})
+		return
+	}
+	challenge, ok := challengeVal.(string)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "invalid session data",
+		})
+		return
+	}
+
 	// Verify 2FA code using existing logic
-	twoFA, err := model.GetTwoFAByUserId(userID.(int))
+	twoFA, err := model.GetTwoFAByUserId(userID)
 	if err != nil || twoFA == nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -349,7 +386,7 @@ func (ctrl *OAuthProviderController) OAuthLogin2FA(c *gin.Context) {
 	valid := common.ValidateTOTPCode(twoFA.Secret, req.Code)
 	if !valid {
 		// Try backup code
-		valid = model.UseBackupCode(userID.(int), req.Code)
+		valid = model.UseBackupCode(userID, req.Code)
 	}
 
 	if !valid {
@@ -365,7 +402,7 @@ func (ctrl *OAuthProviderController) OAuthLogin2FA(c *gin.Context) {
 	session.Delete("oauth_pending_user_id")
 	session.Delete("oauth_pending_challenge")
 
-	user, err := model.GetUserById(userID.(int), false)
+	user, err := model.GetUserById(userID, false)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -383,12 +420,12 @@ func (ctrl *OAuthProviderController) OAuthLogin2FA(c *gin.Context) {
 	}
 
 	// Accept login
-	subject := strconv.Itoa(userID.(int))
-	redirect, err := ctrl.hydra.AcceptLogin(c.Request.Context(), challenge.(string), subject, true, common.HydraLoginRememberFor)
+	subject := strconv.Itoa(userID)
+	redirect, err := ctrl.hydra.AcceptLogin(c.Request.Context(), challenge, subject, true, common.HydraLoginRememberFor)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
-			"message": "failed to accept login: " + err.Error(),
+			"message": "failed to accept login",
 		})
 		return
 	}
