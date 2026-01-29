@@ -121,6 +121,7 @@ func (ctrl *OAuthProviderController) OAuthLogin(c *gin.Context) {
 	// Get login request from Hydra
 	loginReq, err := ctrl.hydra.GetLoginRequest(c.Request.Context(), challenge)
 	if err != nil {
+		common.SysError("OAuth login: failed to get login request: " + err.Error())
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"message": "invalid login challenge: " + err.Error(),
@@ -148,6 +149,7 @@ func (ctrl *OAuthProviderController) OAuthLogin(c *gin.Context) {
 					// Both Hydra and new-api agree on the same user, accept immediately
 					redirect, err := ctrl.hydra.AcceptLogin(c.Request.Context(), challenge, sessionSubject, false, 0)
 					if err != nil {
+						common.SysError("OAuth login: failed to accept login (skip): " + err.Error())
 						c.JSON(http.StatusInternalServerError, gin.H{
 							"success": false,
 							"message": "failed to accept login",
@@ -180,6 +182,7 @@ func (ctrl *OAuthProviderController) OAuthLogin(c *gin.Context) {
 			subject := strconv.Itoa(sessionUserID)
 			redirect, err := ctrl.hydra.AcceptLogin(c.Request.Context(), challenge, subject, true, common.HydraLoginRememberFor)
 			if err != nil {
+				common.SysError("OAuth login: failed to accept login (session): " + err.Error())
 				c.JSON(http.StatusInternalServerError, gin.H{
 					"success": false,
 					"message": "failed to accept login",
@@ -251,9 +254,11 @@ func (ctrl *OAuthProviderController) OAuthLoginSubmit(c *gin.Context) {
 		Password: req.Password,
 	}
 	if err := user.ValidateAndFill(); err != nil {
+		common.SysLog("OAuth login: user validation failed for " + req.Username + ": " + err.Error())
 		// Reject login with error
 		redirect, rejectErr := ctrl.hydra.RejectLogin(c.Request.Context(), req.Challenge, "access_denied", err.Error())
 		if rejectErr != nil {
+			common.SysError("OAuth login: failed to reject login: " + rejectErr.Error())
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"success": false,
 				"message": "failed to reject login: " + rejectErr.Error(),
@@ -275,6 +280,7 @@ func (ctrl *OAuthProviderController) OAuthLoginSubmit(c *gin.Context) {
 		session.Set("oauth_pending_user_id", user.Id)
 		session.Set("oauth_pending_challenge", req.Challenge)
 		if err := session.Save(); err != nil {
+			common.SysError("OAuth login: failed to save 2FA pending session: " + err.Error())
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"success": false,
 				"message": "failed to save session",
@@ -293,6 +299,7 @@ func (ctrl *OAuthProviderController) OAuthLoginSubmit(c *gin.Context) {
 	}
 
 	if err := setOAuthSession(c, &user); err != nil {
+		common.SysError("OAuth login: failed to save session: " + err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"message": "failed to save session",
@@ -304,6 +311,7 @@ func (ctrl *OAuthProviderController) OAuthLoginSubmit(c *gin.Context) {
 	subject := strconv.Itoa(user.Id)
 	redirect, err := ctrl.hydra.AcceptLogin(c.Request.Context(), req.Challenge, subject, true, common.HydraLoginRememberFor)
 	if err != nil {
+		common.SysError("OAuth login: failed to accept login: " + err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"message": "failed to accept login: " + err.Error(),
@@ -373,6 +381,7 @@ func (ctrl *OAuthProviderController) OAuthLogin2FA(c *gin.Context) {
 	// Verify 2FA code using existing logic
 	twoFA, err := model.GetTwoFAByUserId(userID)
 	if err != nil || twoFA == nil {
+		common.SysError(fmt.Sprintf("OAuth 2FA: failed to get 2FA config for user %d: %v", userID, err))
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"message": "2FA not configured",
@@ -411,6 +420,7 @@ func (ctrl *OAuthProviderController) OAuthLogin2FA(c *gin.Context) {
 
 	user, err := model.GetUserById(userID, false)
 	if err != nil {
+		common.SysError(fmt.Sprintf("OAuth 2FA: failed to load user %d: %s", userID, err.Error()))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"message": "failed to load user",
@@ -419,6 +429,7 @@ func (ctrl *OAuthProviderController) OAuthLogin2FA(c *gin.Context) {
 	}
 
 	if err := setOAuthSession(c, user); err != nil {
+		common.SysError("OAuth 2FA: failed to save session: " + err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"message": "failed to save session",
@@ -430,6 +441,7 @@ func (ctrl *OAuthProviderController) OAuthLogin2FA(c *gin.Context) {
 	subject := strconv.Itoa(userID)
 	redirect, err := ctrl.hydra.AcceptLogin(c.Request.Context(), challenge, subject, true, common.HydraLoginRememberFor)
 	if err != nil {
+		common.SysError("OAuth 2FA: failed to accept login: " + err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"message": "failed to accept login",
@@ -466,6 +478,7 @@ func (ctrl *OAuthProviderController) OAuthConsent(c *gin.Context) {
 
 	consentReq, err := ctrl.hydra.GetConsentRequest(c.Request.Context(), challenge)
 	if err != nil {
+		common.SysError("OAuth consent: failed to get consent request: " + err.Error())
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"message": "invalid consent challenge: " + err.Error(),
@@ -478,6 +491,7 @@ func (ctrl *OAuthProviderController) OAuthConsent(c *gin.Context) {
 	if subject == "" || session.Get("id") == nil || fmt.Sprint(session.Get("id")) != subject {
 		redirect, err := ctrl.hydra.RejectConsent(c.Request.Context(), challenge, "login_required", "user login required")
 		if err != nil {
+			common.SysError("OAuth consent: failed to reject consent (no session): " + err.Error())
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"success": false,
 				"message": "failed to reject consent: " + err.Error(),
@@ -504,6 +518,7 @@ func (ctrl *OAuthProviderController) OAuthConsent(c *gin.Context) {
 			nil,
 		)
 		if err != nil {
+			common.SysError("OAuth consent: failed to accept consent (skip): " + err.Error())
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"success": false,
 				"message": "failed to accept consent: " + err.Error(),
@@ -532,6 +547,7 @@ func (ctrl *OAuthProviderController) OAuthConsent(c *gin.Context) {
 			nil,
 		)
 		if err != nil {
+			common.SysError("OAuth consent: failed to accept consent (trusted client): " + err.Error())
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"success": false,
 				"message": "failed to accept consent: " + err.Error(),
@@ -589,6 +605,7 @@ func (ctrl *OAuthProviderController) OAuthConsentSubmit(c *gin.Context) {
 
 	consentReq, err := ctrl.hydra.GetConsentRequest(c.Request.Context(), req.Challenge)
 	if err != nil {
+		common.SysError("OAuth consent submit: failed to get consent request: " + err.Error())
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"message": "invalid consent challenge: " + err.Error(),
@@ -601,6 +618,7 @@ func (ctrl *OAuthProviderController) OAuthConsentSubmit(c *gin.Context) {
 	if subject == "" || session.Get("id") == nil || fmt.Sprint(session.Get("id")) != subject {
 		reject, err := ctrl.hydra.RejectConsent(c.Request.Context(), req.Challenge, "login_required", "user login required")
 		if err != nil {
+			common.SysError("OAuth consent submit: failed to reject consent (no session): " + err.Error())
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"success": false,
 				"message": "failed to reject consent: " + err.Error(),
@@ -630,6 +648,7 @@ func (ctrl *OAuthProviderController) OAuthConsentSubmit(c *gin.Context) {
 		nil,
 	)
 	if err != nil {
+		common.SysError("OAuth consent submit: failed to accept consent: " + err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"message": "failed to accept consent: " + err.Error(),
@@ -668,6 +687,7 @@ func (ctrl *OAuthProviderController) OAuthConsentReject(c *gin.Context) {
 
 	consentReq, err := ctrl.hydra.GetConsentRequest(c.Request.Context(), req.Challenge)
 	if err != nil {
+		common.SysError("OAuth consent reject: failed to get consent request: " + err.Error())
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"message": "invalid consent challenge: " + err.Error(),
@@ -680,6 +700,7 @@ func (ctrl *OAuthProviderController) OAuthConsentReject(c *gin.Context) {
 	if subject == "" || session.Get("id") == nil || fmt.Sprint(session.Get("id")) != subject {
 		reject, err := ctrl.hydra.RejectConsent(c.Request.Context(), req.Challenge, "login_required", "user login required")
 		if err != nil {
+			common.SysError("OAuth consent reject: failed to reject consent (no session): " + err.Error())
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"success": false,
 				"message": "failed to reject consent: " + err.Error(),
@@ -697,6 +718,7 @@ func (ctrl *OAuthProviderController) OAuthConsentReject(c *gin.Context) {
 
 	redirect, err := ctrl.hydra.RejectConsent(c.Request.Context(), req.Challenge, "access_denied", "user denied consent")
 	if err != nil {
+		common.SysError("OAuth consent reject: failed to reject consent: " + err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"message": "failed to reject consent: " + err.Error(),
@@ -726,6 +748,7 @@ func (ctrl *OAuthProviderController) OAuthLogout(c *gin.Context) {
 	// Validate the logout challenge exists
 	_, err := ctrl.hydra.GetLogoutRequest(c.Request.Context(), challenge)
 	if err != nil {
+		common.SysError("OAuth logout: failed to get logout request: " + err.Error())
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"message": "invalid logout challenge: " + err.Error(),
@@ -737,6 +760,7 @@ func (ctrl *OAuthProviderController) OAuthLogout(c *gin.Context) {
 	// Could show a confirmation page if needed
 	redirect, err := ctrl.hydra.AcceptLogout(c.Request.Context(), challenge)
 	if err != nil {
+		common.SysError("OAuth logout: failed to accept logout: " + err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"message": "failed to accept logout: " + err.Error(),
@@ -835,6 +859,7 @@ func (ctrl *OAuthProviderController) OAuthRegisterClient(c *gin.Context) {
 		req.TokenEndpointAuthMethod,
 	)
 	if err != nil {
+		common.SysError("OAuth register client: failed to create client in Hydra: " + err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"message": "failed to create client: " + err.Error(),
@@ -866,6 +891,7 @@ func (ctrl *OAuthProviderController) OAuthRegisterClient(c *gin.Context) {
 func (ctrl *OAuthProviderController) OAuthListClients(c *gin.Context) {
 	clients, err := ctrl.hydra.ListOAuth2Clients(c.Request.Context())
 	if err != nil {
+		common.SysError("OAuth list clients: failed to list clients: " + err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"message": "failed to list clients: " + err.Error(),
@@ -892,6 +918,7 @@ func (ctrl *OAuthProviderController) OAuthDeleteClient(c *gin.Context) {
 
 	// Delete from Hydra
 	if err := ctrl.hydra.DeleteOAuth2Client(c.Request.Context(), clientID); err != nil {
+		common.SysError("OAuth delete client: failed to delete client " + clientID + ": " + err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"message": "failed to delete client: " + err.Error(),
@@ -966,6 +993,7 @@ func (ctrl *OAuthProviderController) OAuthUpdateClient(c *gin.Context) {
 		req.TokenEndpointAuthMethod,
 	)
 	if err != nil {
+		common.SysError("OAuth update client: failed to update client " + clientID + ": " + err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"message": "failed to update client: " + err.Error(),
