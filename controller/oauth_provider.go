@@ -16,7 +16,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// rewriteOAuthRedirect rewrites Hydra redirect URLs to use the request's host/scheme
+// rewriteOAuthRedirect rewrites Hydra internal redirect URLs to use the request's host/scheme.
+// Only rewrites URLs that point to Hydra's internal paths (oauth2/*), not client redirect_uris.
 func rewriteOAuthRedirect(c *gin.Context, redirectURL string) string {
 	if redirectURL == "" {
 		return redirectURL
@@ -24,6 +25,11 @@ func rewriteOAuthRedirect(c *gin.Context, redirectURL string) string {
 
 	parsed, err := url.Parse(redirectURL)
 	if err != nil {
+		return redirectURL
+	}
+
+	// Only rewrite Hydra internal OAuth paths, not client redirect_uris
+	if !isHydraInternalPath(parsed.Path) {
 		return redirectURL
 	}
 
@@ -40,6 +46,20 @@ func rewriteOAuthRedirect(c *gin.Context, redirectURL string) string {
 	parsed.Scheme = scheme
 
 	return parsed.String()
+}
+
+// isHydraInternalPath checks if the path is a Hydra/new-api internal OAuth path
+func isHydraInternalPath(path string) bool {
+	internalPaths := []string{
+		"/oauth2/",
+		"/oauth/",
+	}
+	for _, p := range internalPaths {
+		if strings.HasPrefix(path, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // OAuthProviderController handles Hydra login/consent/logout flows
@@ -92,30 +112,37 @@ func (ctrl *OAuthProviderController) OAuthLogin(c *gin.Context) {
 		return
 	}
 
-	// If skip is true, the user has already authenticated with Hydra
-	// We can accept the login request immediately
+	// Check if user is already logged in via new-api session
+	session := sessions.Default(c)
+	userID := session.Get("id")
+
+	// If skip is true, Hydra thinks the user is already authenticated
+	// But we need to verify new-api session is also valid
 	if loginReq.GetSkip() {
-		redirect, err := ctrl.hydra.AcceptLogin(c.Request.Context(), challenge, loginReq.GetSubject(), false, 0)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"success": false,
-				"message": "failed to accept login: " + err.Error(),
+		if userID != nil {
+			// Both Hydra and new-api agree user is logged in, accept immediately
+			redirect, err := ctrl.hydra.AcceptLogin(c.Request.Context(), challenge, loginReq.GetSubject(), false, 0)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"success": false,
+					"message": "failed to accept login: " + err.Error(),
+				})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{
+				"success": true,
+				"data": gin.H{
+					"redirect_to": rewriteOAuthRedirect(c, redirect.RedirectTo),
+				},
 			})
 			return
 		}
-		// Return JSON for frontend to handle redirect (avoid CORS issues with HTTP redirects)
-		c.JSON(http.StatusOK, gin.H{
-			"success": true,
-			"data": gin.H{
-				"redirect_to": rewriteOAuthRedirect(c, redirect.RedirectTo),
-			},
-		})
-		return
+		// Hydra says skip but new-api session is gone (user logged out)
+		// Don't skip, show login page instead
 	}
 
 	// Check if user is already logged in via session
-	session := sessions.Default(c)
-	if userID := session.Get("id"); userID != nil {
+	if userID != nil {
 		subject := strconv.Itoa(userID.(int))
 		redirect, err := ctrl.hydra.AcceptLogin(c.Request.Context(), challenge, subject, true, common.HydraLoginRememberFor)
 		if err != nil {
