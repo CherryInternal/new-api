@@ -28,7 +28,6 @@ func rewriteOAuthRedirect(c *gin.Context, redirectURL string) string {
 		return redirectURL
 	}
 
-	// Only rewrite http/https URLs, not custom schemes (e.g., cherrystudio://)
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
 		return redirectURL
 	}
@@ -316,6 +315,14 @@ func (ctrl *OAuthProviderController) OAuthLoginSubmit(c *gin.Context) {
 		"success": true,
 		"data": gin.H{
 			"redirect_to": rewriteOAuthRedirect(c, redirect.RedirectTo),
+			"user": gin.H{
+				"id":           user.Id,
+				"username":     user.Username,
+				"display_name": user.DisplayName,
+				"role":         user.Role,
+				"status":       user.Status,
+				"group":        user.Group,
+			},
 		},
 	})
 }
@@ -434,6 +441,14 @@ func (ctrl *OAuthProviderController) OAuthLogin2FA(c *gin.Context) {
 		"success": true,
 		"data": gin.H{
 			"redirect_to": rewriteOAuthRedirect(c, redirect.RedirectTo),
+			"user": gin.H{
+				"id":           user.Id,
+				"username":     user.Username,
+				"display_name": user.DisplayName,
+				"role":         user.Role,
+				"status":       user.Status,
+				"group":        user.Group,
+			},
 		},
 	})
 }
