@@ -20,14 +20,35 @@ For commercial licensing, please contact support@quantumnous.com
 import React from 'react';
 import { Button, Space, Tag, Modal, Typography, Tooltip } from '@douyinfe/semi-ui';
 import { IconCopy } from '@douyinfe/semi-icons';
-import { timestamp2string } from '../../../helpers';
 
 const { Text } = Typography;
 
-// Render timestamp
+// Render timestamp (supports both Unix timestamp and ISO 8601 date string)
 function renderTimestamp(timestamp) {
   if (!timestamp) return '-';
-  return <>{timestamp2string(timestamp)}</>;
+
+  let date;
+  if (typeof timestamp === 'string') {
+    // ISO 8601 format from Hydra API (e.g., "2025-01-29T10:30:00Z")
+    date = new Date(timestamp);
+  } else {
+    // Unix timestamp (seconds)
+    date = new Date(timestamp * 1000);
+  }
+
+  if (isNaN(date.getTime())) return '-';
+
+  const formatter = new Intl.DateTimeFormat(navigator.language, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+
+  return <>{formatter.format(date)}</>;
 }
 
 // Render client type
