@@ -104,10 +104,13 @@ jobs:
         id: docker-tags
         run: |
           if [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
+            # dev branch: dev + dev-{version}
             echo "TAGS=ghcr.io/${{ env.GHCR_REPOSITORY }}:dev,ghcr.io/${{ env.GHCR_REPOSITORY }}:dev-${{ env.VERSION }}" >> $GITHUB_OUTPUT
           elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "TAGS=ghcr.io/${{ env.GHCR_REPOSITORY }}:${{ env.VERSION }},ghcr.io/${{ env.GHCR_REPOSITORY }}:latest" >> $GITHUB_OUTPUT
+            # main branch: latest + {version}
+            echo "TAGS=ghcr.io/${{ env.GHCR_REPOSITORY }}:latest,ghcr.io/${{ env.GHCR_REPOSITORY }}:${{ env.VERSION }}" >> $GITHUB_OUTPUT
           else
+            # git tag: {version} only
             echo "TAGS=ghcr.io/${{ env.GHCR_REPOSITORY }}:${{ env.VERSION }}" >> $GITHUB_OUTPUT
           fi
 
