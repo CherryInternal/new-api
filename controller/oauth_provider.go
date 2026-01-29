@@ -28,6 +28,11 @@ func rewriteOAuthRedirect(c *gin.Context, redirectURL string) string {
 		return redirectURL
 	}
 
+	// Only rewrite http/https URLs, not custom schemes (e.g., cherrystudio://)
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return redirectURL
+	}
+
 	// Only rewrite Hydra internal OAuth paths, not client redirect_uris
 	if !isHydraInternalPath(parsed.Path) {
 		return redirectURL
@@ -49,13 +54,25 @@ func rewriteOAuthRedirect(c *gin.Context, redirectURL string) string {
 }
 
 // isHydraInternalPath checks if the path is a Hydra/new-api internal OAuth path
+// Only matches specific known internal paths, not client redirect_uris
 func isHydraInternalPath(path string) bool {
+	// Exact internal paths that need rewriting
 	internalPaths := []string{
-		"/oauth2/",
-		"/oauth/",
+		// Hydra public endpoints
+		"/oauth2/auth",
+		"/oauth2/token",
+		"/oauth2/revoke",
+		"/oauth2/sessions",
+		"/oauth2/fallbacks/login",
+		"/oauth2/fallbacks/consent",
+		"/oauth2/fallbacks/logout",
+		// new-api OAuth pages
+		"/oauth/login",
+		"/oauth/consent",
+		"/oauth/logout",
 	}
 	for _, p := range internalPaths {
-		if strings.HasPrefix(path, p) {
+		if path == p || strings.HasPrefix(path, p+"?") || strings.HasPrefix(path, p+"/") {
 			return true
 		}
 	}
