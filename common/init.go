@@ -102,6 +102,21 @@ func InitEnv() {
 	CriticalRateLimitEnable = GetEnvOrDefaultBool("CRITICAL_RATE_LIMIT_ENABLE", true)
 	CriticalRateLimitNum = GetEnvOrDefault("CRITICAL_RATE_LIMIT", 20)
 	CriticalRateLimitDuration = int64(GetEnvOrDefault("CRITICAL_RATE_LIMIT_DURATION", 20*60))
+
+	// Hydra OAuth Provider configuration
+	HydraEnabled = GetEnvOrDefaultBool("HYDRA_ENABLED", false)
+	HydraAdminURL = GetEnvOrDefaultString("HYDRA_ADMIN_URL", "")
+	HydraPublicURL = GetEnvOrDefaultString("HYDRA_PUBLIC_URL", "http://127.0.0.1:4444")
+	if trustedClients := GetEnvOrDefaultString("HYDRA_TRUSTED_CLIENTS", ""); trustedClients != "" {
+		for _, c := range strings.Split(trustedClients, ",") {
+			if trimmed := strings.TrimSpace(c); trimmed != "" {
+				HydraTrustedClients = append(HydraTrustedClients, trimmed)
+			}
+		}
+	}
+	HydraLoginRememberFor = int64(GetEnvOrDefault("HYDRA_LOGIN_REMEMBER_FOR", 2592000))     // Default: 30 days (same as new-api session)
+	HydraConsentRememberFor = int64(GetEnvOrDefault("HYDRA_CONSENT_REMEMBER_FOR", 2592000)) // Default: 30 days
+
 	initConstantEnv()
 }
 

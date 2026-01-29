@@ -1,6 +1,7 @@
 package ali
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/relay/channel"
 	"github.com/QuantumNous/new-api/relay/channel/claude"
 	"github.com/QuantumNous/new-api/relay/channel/openai"
@@ -45,7 +47,11 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 		case constant.RelayModeRerank:
 			fullRequestURL = fmt.Sprintf("%s/api/v1/services/rerank/text-rerank/text-rerank", info.ChannelBaseUrl)
 		case constant.RelayModeImagesGenerations:
-			fullRequestURL = fmt.Sprintf("%s/api/v1/services/aigc/text2image/image-synthesis", info.ChannelBaseUrl)
+			if isQWENImageModel(info.OriginModelName) {
+				fullRequestURL = fmt.Sprintf("%s/api/v1/services/aigc/multimodal-generation/generation", info.ChannelBaseUrl)
+			} else {
+				fullRequestURL = fmt.Sprintf("%s/api/v1/services/aigc/text2image/image-synthesis", info.ChannelBaseUrl)
+			}
 		case constant.RelayModeImagesEdits:
 			if isWanModel(info.OriginModelName) {
 				fullRequestURL = fmt.Sprintf("%s/api/v1/services/aigc/image2image/image-synthesis", info.ChannelBaseUrl)
@@ -58,7 +64,7 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 			fullRequestURL = fmt.Sprintf("%s/compatible-mode/v1/chat/completions", info.ChannelBaseUrl)
 		}
 	}
-
+	logger.LogInfo(context.Background(), fmt.Sprintf("aliAdaptor.GetRequestURL %s", fullRequestURL))
 	return fullRequestURL, nil
 }
 
@@ -108,11 +114,15 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 
 func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.ImageRequest) (any, error) {
 	if info.RelayMode == constant.RelayModeImagesGenerations {
-		aliRequest, err := oaiImage2Ali(request)
-		if err != nil {
-			return nil, fmt.Errorf("convert image request failed: %w", err)
+		if isQWENImageModel(info.OriginModelName) {
+			return oaiImageGen2QwenImageGen(c, info, request)
+		} else {
+			aliRequest, err := oaiImage2Ali(request)
+			if err != nil {
+				return nil, fmt.Errorf("convert image request failed: %w", err)
+			}
+			return aliRequest, nil
 		}
-		return aliRequest, nil
 	} else if info.RelayMode == constant.RelayModeImagesEdits {
 		if isWanModel(info.OriginModelName) {
 			return oaiFormEdit2WanxImageEdit(c, info, request)
@@ -169,7 +179,11 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 	default:
 		switch info.RelayMode {
 		case constant.RelayModeImagesGenerations:
-			err, usage = aliImageHandler(c, resp, info)
+			if isQWENImageModel(info.OriginModelName) {
+				err, usage = aliQwenImageHandler(c, resp, info)
+			} else {
+				err, usage = aliImageHandler(c, resp, info)
+			}
 		case constant.RelayModeImagesEdits:
 			if isWanModel(info.OriginModelName) {
 				err, usage = aliImageHandler(c, resp, info)

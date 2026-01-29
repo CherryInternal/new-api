@@ -16,9 +16,9 @@ import (
 	"github.com/QuantumNous/new-api/setting/system_setting"
 
 	"github.com/gin-gonic/gin"
-	"github.com/stripe/stripe-go/v81"
-	"github.com/stripe/stripe-go/v81/checkout/session"
-	"github.com/stripe/stripe-go/v81/webhook"
+	"github.com/stripe/stripe-go/v83"
+	"github.com/stripe/stripe-go/v83/checkout/session"
+	"github.com/stripe/stripe-go/v83/webhook"
 	"github.com/thanhpk/randstr"
 )
 
@@ -239,6 +239,14 @@ func genStripeLink(referenceId string, customerId string, email string, amount i
 		params.CustomerCreation = stripe.String(string(stripe.CheckoutSessionCustomerCreationAlways))
 	} else {
 		params.Customer = stripe.String(customerId)
+	}
+
+	if setting.StripeManagedPaymentsEnabled {
+		// see: https://docs.stripe.com/payments/managed-payments/set-up?mode=payment
+		headers := make(http.Header)
+		headers.Set("Stripe-Version", "2025-03-31.basil; managed_payments_preview=v1")
+		params.Params.Headers = headers
+		params.AddExtra("managed_payments[enabled]", "true")
 	}
 
 	result, err := session.New(params)

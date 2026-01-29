@@ -77,13 +77,24 @@ func testChannel(channel *model.Channel, testModel string, endpointType string) 
 
 	requestPath := "/v1/chat/completions"
 
+	// 需要排除 ImageEdit 模型
+	if strings.Contains(strings.ToLower(testModel), "image") && strings.Contains(strings.ToLower(testModel), "edit") {
+		return testResult{
+			localErr:    errors.New("image edit model testing is not supported"),
+			newAPIError: nil,
+		}
+	}
+
 	// 如果指定了端点类型，使用指定的端点类型
 	if endpointType != "" {
-		if endpointInfo, ok := common.GetDefaultEndpointInfo(constant.EndpointType(endpointType)); ok {
+		if endpointInfo, ok := common.GetTestDefaultEndpointInfo(constant.EndpointType(endpointType)); ok {
 			requestPath = endpointInfo.Path
 		}
 	} else {
 		// 如果没有指定端点类型，使用原有的自动检测逻辑
+
+		modelName := strings.ToLower(testModel)
+
 		// 先判断是否为 Embedding 模型
 		if strings.Contains(strings.ToLower(testModel), "embedding") ||
 			strings.HasPrefix(testModel, "m3e") || // m3e 系列模型
@@ -91,11 +102,35 @@ func testChannel(channel *model.Channel, testModel string, endpointType string) 
 			strings.Contains(testModel, "embed") ||
 			channel.Type == constant.ChannelTypeMokaAI { // 其他 embedding 模型
 			requestPath = "/v1/embeddings" // 修改请求路径
+			endpointType = string(constant.EndpointTypeEmbeddings)
 		}
-
+		// Rerank 模型
+		if strings.Contains(modelName, "rerank") {
+			requestPath = "/v1/rerank"
+			endpointType = string(constant.EndpointTypeJinaRerank)
+		}
 		// VolcEngine 图像生成模型
 		if channel.Type == constant.ChannelTypeVolcEngine && strings.Contains(testModel, "seedream") {
 			requestPath = "/v1/images/generations"
+			endpointType = string(constant.EndpointTypeImageGeneration)
+		}
+		// Image Generation 模型
+		if strings.Contains(modelName, "image") && strings.Contains(modelName, "qwen") && !strings.Contains(modelName, "edit") {
+			requestPath = "/v1/images/generations"
+			endpointType = string(constant.EndpointTypeImageGeneration)
+		}
+		if strings.Contains(modelName, "image") && strings.Contains(modelName, "gpt") && !strings.Contains(modelName, "edit") {
+			requestPath = "/v1/images/generations"
+			endpointType = string(constant.EndpointTypeImageGeneration)
+		}
+		if strings.Contains(modelName, "kwai-kolors") && !strings.Contains(modelName, "edit") {
+			requestPath = "/v1/images/generations"
+			endpointType = string(constant.EndpointTypeImageGeneration)
+		}
+		// Response 模型
+		if strings.Contains(modelName, "gpt-5.2") {
+			requestPath = "/v1/responses"
+			endpointType = string(constant.EndpointTypeOpenAIResponse)
 		}
 	}
 
@@ -443,9 +478,10 @@ func buildTestRequest(model string, endpointType string) dto.Request {
 
 	// 自动检测逻辑（保持原有行为）
 	// 先判断是否为 Embedding 模型
-	if strings.Contains(strings.ToLower(model), "embedding") ||
-		strings.HasPrefix(model, "m3e") ||
-		strings.Contains(model, "bge-") {
+	modelName := strings.ToLower(model)
+	if !strings.Contains(modelName, "rerank") && (strings.Contains(modelName, "embedding") ||
+		strings.HasPrefix(modelName, "m3e") ||
+		strings.Contains(modelName, "bge-")) {
 		// 返回 EmbeddingRequest
 		return &dto.EmbeddingRequest{
 			Model: model,
