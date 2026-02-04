@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { useContext, useEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { UserContext } from '../../context/User';
 import {
@@ -29,29 +29,17 @@ import {
   updateAPI,
   getSystemName,
   setUserData,
-  onGitHubOAuthClicked,
-  onOIDCClicked,
-  onLinuxDOOAuthClicked,
   prepareCredentialRequestOptions,
   buildAssertionResult,
   isPasskeySupported,
 } from '../../helpers';
 import Turnstile from 'react-turnstile';
-import { Button, Card, Checkbox, Divider, Form, Icon, Modal } from '@douyinfe/semi-ui';
+import { Button, Card, Checkbox, Divider, Form, Modal } from '@douyinfe/semi-ui';
 import Title from '@douyinfe/semi-ui/lib/es/typography/title';
 import Text from '@douyinfe/semi-ui/lib/es/typography/text';
-import TelegramLoginButton from 'react-telegram-login';
-
-import {
-  IconGithubLogo,
-  IconMail,
-  IconLock,
-  IconKey,
-} from '@douyinfe/semi-icons';
-import OIDCIcon from '../common/logo/OIDCIcon';
-import WeChatIcon from '../common/logo/WeChatIcon';
-import LinuxDoIcon from '../common/logo/LinuxDoIcon';
+import { IconMail, IconLock, IconKey } from '@douyinfe/semi-icons';
 import TwoFAVerification from './TwoFAVerification';
+import OAuthButtons from './OAuthButtons';
 import { useTranslation } from 'react-i18next';
 
 const LoginForm = () => {
@@ -713,91 +701,14 @@ const LoginForm = () => {
                 </div>
               </Form>
 
-              {(status.github_oauth ||
-                status.oidc_enabled ||
-                status.wechat_login ||
-                status.linuxdo_oauth ||
-                status.telegram_oauth) && (
-                <>
-                  <Divider margin='12px' align='center'>
-                    {t('或')}
-                  </Divider>
+              <Divider margin='12px' align='center'>
+                {t('或')}
+              </Divider>
 
-                  <div className='space-y-3'>
-                    {status.wechat_login && (
-                      <Button
-                        theme='outline'
-                        className='w-full h-12 flex items-center justify-center !rounded-full border border-gray-200 hover:bg-gray-50 transition-colors'
-                        type='tertiary'
-                        icon={
-                          <Icon svg={<WeChatIcon />} style={{ color: '#07C160' }} />
-                        }
-                        onClick={onWeChatLoginClicked}
-                        loading={wechatLoading}
-                      >
-                        <span className='ml-3'>{t('使用 微信 继续')}</span>
-                      </Button>
-                    )}
-
-                    {status.github_oauth && (
-                      <Button
-                        theme='outline'
-                        className='w-full h-12 flex items-center justify-center !rounded-full border border-gray-200 hover:bg-gray-50 transition-colors'
-                        type='tertiary'
-                        icon={<IconGithubLogo size='large' />}
-                        onClick={handleGitHubClick}
-                        loading={githubLoading}
-                        disabled={githubButtonDisabled}
-                      >
-                        <span className='ml-3'>{githubButtonText}</span>
-                      </Button>
-                    )}
-
-                    {status.oidc_enabled && (
-                      <Button
-                        theme='outline'
-                        className='w-full h-12 flex items-center justify-center !rounded-full border border-gray-200 hover:bg-gray-50 transition-colors'
-                        type='tertiary'
-                        icon={<OIDCIcon style={{ color: '#1877F2' }} />}
-                        onClick={handleOIDCClick}
-                        loading={oidcLoading}
-                      >
-                        <span className='ml-3'>{t('使用 OIDC 继续')}</span>
-                      </Button>
-                    )}
-
-                    {status.linuxdo_oauth && (
-                      <Button
-                        theme='outline'
-                        className='w-full h-12 flex items-center justify-center !rounded-full border border-gray-200 hover:bg-gray-50 transition-colors'
-                        type='tertiary'
-                        icon={
-                          <LinuxDoIcon
-                            style={{
-                              color: '#E95420',
-                              width: '20px',
-                              height: '20px',
-                            }}
-                          />
-                        }
-                        onClick={handleLinuxDOClick}
-                        loading={linuxdoLoading}
-                      >
-                        <span className='ml-3'>{t('使用 LinuxDO 继续')}</span>
-                      </Button>
-                    )}
-
-                    {status.telegram_oauth && (
-                      <div className='flex justify-center my-2'>
-                        <TelegramLoginButton
-                          dataOnauth={onTelegramLoginClicked}
-                          botName={status.telegram_bot_name}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
+              <OAuthButtons
+                requireTermsAgreement={hasUserAgreement || hasPrivacyPolicy}
+                agreedToTerms={agreedToTerms}
+              />
 
               {!status.self_use_mode_enabled && (
                 <div className='mt-6 text-center text-sm'>
