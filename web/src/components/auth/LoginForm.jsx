@@ -70,7 +70,7 @@ const LoginForm = () => {
   const [turnstileSiteKey, setTurnstileSiteKey] = useState('');
   const [turnstileToken, setTurnstileToken] = useState('');
   const [showWeChatLoginModal, setShowWeChatLoginModal] = useState(false);
-  const [showEmailLogin, setShowEmailLogin] = useState(false);
+  const [showEmailLogin, setShowEmailLogin] = useState(true);
   const [wechatLoading, setWechatLoading] = useState(false);
   const [githubLoading, setGithubLoading] = useState(false);
   const [oidcLoading, setOidcLoading] = useState(false);
@@ -723,16 +723,78 @@ const LoginForm = () => {
                     {t('或')}
                   </Divider>
 
-                  <div className='mt-4 text-center'>
-                    <Button
-                      theme='outline'
-                      type='tertiary'
-                      className='w-full !rounded-full'
-                      onClick={handleOtherLoginOptionsClick}
-                      loading={otherLoginOptionsLoading}
-                    >
-                      {t('其他登录选项')}
-                    </Button>
+                  <div className='space-y-3'>
+                    {status.wechat_login && (
+                      <Button
+                        theme='outline'
+                        className='w-full h-12 flex items-center justify-center !rounded-full border border-gray-200 hover:bg-gray-50 transition-colors'
+                        type='tertiary'
+                        icon={
+                          <Icon svg={<WeChatIcon />} style={{ color: '#07C160' }} />
+                        }
+                        onClick={onWeChatLoginClicked}
+                        loading={wechatLoading}
+                      >
+                        <span className='ml-3'>{t('使用 微信 继续')}</span>
+                      </Button>
+                    )}
+
+                    {status.github_oauth && (
+                      <Button
+                        theme='outline'
+                        className='w-full h-12 flex items-center justify-center !rounded-full border border-gray-200 hover:bg-gray-50 transition-colors'
+                        type='tertiary'
+                        icon={<IconGithubLogo size='large' />}
+                        onClick={handleGitHubClick}
+                        loading={githubLoading}
+                        disabled={githubButtonDisabled}
+                      >
+                        <span className='ml-3'>{githubButtonText}</span>
+                      </Button>
+                    )}
+
+                    {status.oidc_enabled && (
+                      <Button
+                        theme='outline'
+                        className='w-full h-12 flex items-center justify-center !rounded-full border border-gray-200 hover:bg-gray-50 transition-colors'
+                        type='tertiary'
+                        icon={<OIDCIcon style={{ color: '#1877F2' }} />}
+                        onClick={handleOIDCClick}
+                        loading={oidcLoading}
+                      >
+                        <span className='ml-3'>{t('使用 OIDC 继续')}</span>
+                      </Button>
+                    )}
+
+                    {status.linuxdo_oauth && (
+                      <Button
+                        theme='outline'
+                        className='w-full h-12 flex items-center justify-center !rounded-full border border-gray-200 hover:bg-gray-50 transition-colors'
+                        type='tertiary'
+                        icon={
+                          <LinuxDoIcon
+                            style={{
+                              color: '#E95420',
+                              width: '20px',
+                              height: '20px',
+                            }}
+                          />
+                        }
+                        onClick={handleLinuxDOClick}
+                        loading={linuxdoLoading}
+                      >
+                        <span className='ml-3'>{t('使用 LinuxDO 继续')}</span>
+                      </Button>
+                    )}
+
+                    {status.telegram_oauth && (
+                      <div className='flex justify-center my-2'>
+                        <TelegramLoginButton
+                          dataOnauth={onTelegramLoginClicked}
+                          botName={status.telegram_bot_name}
+                        />
+                      </div>
+                    )}
                   </div>
                 </>
               )}
