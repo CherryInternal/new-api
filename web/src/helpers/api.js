@@ -215,12 +215,17 @@ export const processGroupsData = (data, userGroup) => {
 
 // 原来components中的utils.js
 
-export async function getOAuthState() {
-  let path = '/api/oauth/state';
-  let affCode = localStorage.getItem('aff');
+export async function getOAuthState(loginChallenge = null) {
+  const params = new URLSearchParams();
+  const affCode = localStorage.getItem('aff');
   if (affCode && affCode.length > 0) {
-    path += `?aff=${affCode}`;
+    params.set('aff', affCode);
   }
+  if (loginChallenge) {
+    params.set('login_challenge', loginChallenge);
+  }
+  const queryString = params.toString();
+  const path = '/api/oauth/state' + (queryString ? `?${queryString}` : '');
   const res = await API.get(path);
   const { success, message, data } = res.data;
   if (success) {
@@ -231,8 +236,8 @@ export async function getOAuthState() {
   }
 }
 
-export async function onOIDCClicked(auth_url, client_id, openInNewTab = false) {
-  const state = await getOAuthState();
+export async function onOIDCClicked(auth_url, client_id, openInNewTab = false, loginChallenge = null) {
+  const state = await getOAuthState(loginChallenge);
   if (!state) return;
   const url = new URL(auth_url);
   url.searchParams.set('client_id', client_id);
@@ -247,16 +252,16 @@ export async function onOIDCClicked(auth_url, client_id, openInNewTab = false) {
   }
 }
 
-export async function onGitHubOAuthClicked(github_client_id) {
-  const state = await getOAuthState();
+export async function onGitHubOAuthClicked(github_client_id, loginChallenge = null) {
+  const state = await getOAuthState(loginChallenge);
   if (!state) return;
   window.open(
     `https://github.com/login/oauth/authorize?client_id=${github_client_id}&state=${state}&scope=user:email`,
   );
 }
 
-export async function onLinuxDOOAuthClicked(linuxdo_client_id) {
-  const state = await getOAuthState();
+export async function onLinuxDOOAuthClicked(linuxdo_client_id, loginChallenge = null) {
+  const state = await getOAuthState(loginChallenge);
   if (!state) return;
   window.open(
     `https://connect.linux.do/oauth2/authorize?response_type=code&client_id=${linuxdo_client_id}&state=${state}`,
