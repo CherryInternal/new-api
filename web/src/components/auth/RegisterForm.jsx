@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { useContext, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   API,
@@ -25,31 +25,14 @@ import {
   showError,
   showInfo,
   showSuccess,
-  updateAPI,
   getSystemName,
-  setUserData,
 } from '../../helpers';
 import Turnstile from 'react-turnstile';
-import { Button, Card, Checkbox, Divider, Form, Icon, Modal } from '@douyinfe/semi-ui';
+import { Button, Card, Checkbox, Divider, Form } from '@douyinfe/semi-ui';
 import Title from '@douyinfe/semi-ui/lib/es/typography/title';
 import Text from '@douyinfe/semi-ui/lib/es/typography/text';
-import {
-  IconGithubLogo,
-  IconMail,
-  IconUser,
-  IconLock,
-  IconKey,
-} from '@douyinfe/semi-icons';
-import {
-  onGitHubOAuthClicked,
-  onLinuxDOOAuthClicked,
-  onOIDCClicked,
-} from '../../helpers';
-import OIDCIcon from '../common/logo/OIDCIcon';
-import LinuxDoIcon from '../common/logo/LinuxDoIcon';
-import WeChatIcon from '../common/logo/WeChatIcon';
-import TelegramLoginButton from 'react-telegram-login/src';
-import { UserContext } from '../../context/User';
+import { IconMail, IconUser, IconLock, IconKey } from '@douyinfe/semi-icons';
+import OAuthButtons from './OAuthButtons';
 import { useTranslation } from 'react-i18next';
 
 const RegisterForm = () => {
@@ -63,33 +46,19 @@ const RegisterForm = () => {
     password2: '',
     email: '',
     verification_code: '',
-    wechat_verification_code: '',
   });
   const { username, password, password2 } = inputs;
-  const [userState, userDispatch] = useContext(UserContext);
   const [turnstileEnabled, setTurnstileEnabled] = useState(false);
   const [turnstileSiteKey, setTurnstileSiteKey] = useState('');
   const [turnstileToken, setTurnstileToken] = useState('');
-  const [showWeChatLoginModal, setShowWeChatLoginModal] = useState(false);
   const [showEmailRegister, setShowEmailRegister] = useState(false);
-  const [wechatLoading, setWechatLoading] = useState(false);
-  const [githubLoading, setGithubLoading] = useState(false);
-  const [oidcLoading, setOidcLoading] = useState(false);
-  const [linuxdoLoading, setLinuxdoLoading] = useState(false);
-  const [emailRegisterLoading, setEmailRegisterLoading] = useState(false);
   const [registerLoading, setRegisterLoading] = useState(false);
   const [verificationCodeLoading, setVerificationCodeLoading] = useState(false);
-  const [otherRegisterOptionsLoading, setOtherRegisterOptionsLoading] =
-    useState(false);
-  const [wechatCodeSubmitLoading, setWechatCodeSubmitLoading] = useState(false);
   const [disableButton, setDisableButton] = useState(false);
   const [countdown, setCountdown] = useState(30);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [hasUserAgreement, setHasUserAgreement] = useState(false);
   const [hasPrivacyPolicy, setHasPrivacyPolicy] = useState(false);
-  const [githubButtonText, setGithubButtonText] = useState('使用 GitHub 继续');
-  const [githubButtonDisabled, setGithubButtonDisabled] = useState(false);
-  const githubTimeoutRef = useRef(null);
 
   const logo = getLogo();
   const systemName = getSystemName();
@@ -155,54 +124,12 @@ const RegisterForm = () => {
     return () => clearInterval(countdownInterval); // Clean up on unmount
   }, [disableButton, countdown]);
 
-  useEffect(() => {
-    return () => {
-      if (githubTimeoutRef.current) {
-        clearTimeout(githubTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  const onWeChatLoginClicked = () => {
-    setWechatLoading(true);
-    setShowWeChatLoginModal(true);
-    setWechatLoading(false);
-  };
-
-  const onSubmitWeChatVerificationCode = async () => {
-    if (turnstileEnabled && turnstileToken === '') {
-      showInfo('请稍后几秒重试，Turnstile 正在检查用户环境！');
-      return;
-    }
-    setWechatCodeSubmitLoading(true);
-    try {
-      const res = await API.get(
-        `/api/oauth/wechat?code=${inputs.wechat_verification_code}`,
-      );
-      const { success, message, data } = res.data;
-      if (success) {
-        userDispatch({ type: 'login', payload: data });
-        localStorage.setItem('user', JSON.stringify(data));
-        setUserData(data);
-        updateAPI();
-        navigate('/');
-        showSuccess('登录成功！');
-        setShowWeChatLoginModal(false);
-      } else {
-        showError(message);
-      }
-    } catch (error) {
-      showError('登录失败，请重试');
-    } finally {
-      setWechatCodeSubmitLoading(false);
-    }
-  };
 
   function handleChange(name, value) {
     setInputs((inputs) => ({ ...inputs, [name]: value }));
   }
 
-  async function handleSubmit(e) {
+  async function handleSubmit() {
     if (password.length < 8) {
       showInfo('密码长度不得小于 8 位！');
       return;
@@ -271,91 +198,8 @@ const RegisterForm = () => {
     }
   };
 
-  const handleGitHubClick = () => {
-    if (githubButtonDisabled) {
-      return;
-    }
-    setGithubLoading(true);
-    setGithubButtonDisabled(true);
-    setGithubButtonText(t('正在跳转 GitHub...'));
-    if (githubTimeoutRef.current) {
-      clearTimeout(githubTimeoutRef.current);
-    }
-    githubTimeoutRef.current = setTimeout(() => {
-      setGithubLoading(false);
-      setGithubButtonText(t('请求超时，请刷新页面后重新发起 GitHub 登录'));
-      setGithubButtonDisabled(true);
-    }, 20000);
-    try {
-      onGitHubOAuthClicked(status.github_client_id, loginChallenge);
-    } finally {
-      setTimeout(() => setGithubLoading(false), 3000);
-    }
-  };
-
-  const handleOIDCClick = () => {
-    setOidcLoading(true);
-    try {
-      onOIDCClicked(status.oidc_authorization_endpoint, status.oidc_client_id, false, loginChallenge);
-    } finally {
-      setTimeout(() => setOidcLoading(false), 3000);
-    }
-  };
-
-  const handleLinuxDOClick = () => {
-    setLinuxdoLoading(true);
-    try {
-      onLinuxDOOAuthClicked(status.linuxdo_client_id, loginChallenge);
-    } finally {
-      setTimeout(() => setLinuxdoLoading(false), 3000);
-    }
-  };
-
   const handleEmailRegisterClick = () => {
-    setEmailRegisterLoading(true);
     setShowEmailRegister(true);
-    setEmailRegisterLoading(false);
-  };
-
-  const handleOtherRegisterOptionsClick = () => {
-    setOtherRegisterOptionsLoading(true);
-    setShowEmailRegister(false);
-    setOtherRegisterOptionsLoading(false);
-  };
-
-  const onTelegramLoginClicked = async (response) => {
-    const fields = [
-      'id',
-      'first_name',
-      'last_name',
-      'username',
-      'photo_url',
-      'auth_date',
-      'hash',
-      'lang',
-    ];
-    const params = {};
-    fields.forEach((field) => {
-      if (response[field]) {
-        params[field] = response[field];
-      }
-    });
-    try {
-      const res = await API.get(`/api/oauth/telegram/login`, { params });
-      const { success, message, data } = res.data;
-      if (success) {
-        userDispatch({ type: 'login', payload: data });
-        localStorage.setItem('user', JSON.stringify(data));
-        showSuccess('登录成功！');
-        setUserData(data);
-        updateAPI();
-        navigate('/');
-      } else {
-        showError(message);
-      }
-    } catch (error) {
-      showError('登录失败，请重试');
-    }
   };
 
   const renderOAuthOptions = () => {
@@ -376,94 +220,21 @@ const RegisterForm = () => {
               </Title>
             </div>
             <div className='px-2 py-8'>
-              <div className='space-y-3'>
-                {status.wechat_login && (
-                  <Button
-                    theme='outline'
-                    className='w-full h-12 flex items-center justify-center !rounded-full border border-gray-200 hover:bg-gray-50 transition-colors'
-                    type='tertiary'
-                    icon={
-                      <Icon svg={<WeChatIcon />} style={{ color: '#07C160' }} />
-                    }
-                    onClick={onWeChatLoginClicked}
-                    loading={wechatLoading}
-                  >
-                    <span className='ml-3'>{t('使用 微信 继续')}</span>
-                  </Button>
-                )}
+              <OAuthButtons loginChallenge={loginChallenge} />
 
-                {status.github_oauth && (
-                  <Button
-                    theme='outline'
-                    className='w-full h-12 flex items-center justify-center !rounded-full border border-gray-200 hover:bg-gray-50 transition-colors'
-                    type='tertiary'
-                    icon={<IconGithubLogo size='large' />}
-                    onClick={handleGitHubClick}
-                    loading={githubLoading}
-                    disabled={githubButtonDisabled}
-                  >
-                    <span className='ml-3'>{githubButtonText}</span>
-                  </Button>
-                )}
+              <Divider margin='12px' align='center'>
+                {t('或')}
+              </Divider>
 
-                {status.oidc_enabled && (
-                  <Button
-                    theme='outline'
-                    className='w-full h-12 flex items-center justify-center !rounded-full border border-gray-200 hover:bg-gray-50 transition-colors'
-                    type='tertiary'
-                    icon={<OIDCIcon style={{ color: '#1877F2' }} />}
-                    onClick={handleOIDCClick}
-                    loading={oidcLoading}
-                  >
-                    <span className='ml-3'>{t('使用 OIDC 继续')}</span>
-                  </Button>
-                )}
-
-                {status.linuxdo_oauth && (
-                  <Button
-                    theme='outline'
-                    className='w-full h-12 flex items-center justify-center !rounded-full border border-gray-200 hover:bg-gray-50 transition-colors'
-                    type='tertiary'
-                    icon={
-                      <LinuxDoIcon
-                        style={{
-                          color: '#E95420',
-                          width: '20px',
-                          height: '20px',
-                        }}
-                      />
-                    }
-                    onClick={handleLinuxDOClick}
-                    loading={linuxdoLoading}
-                  >
-                    <span className='ml-3'>{t('使用 LinuxDO 继续')}</span>
-                  </Button>
-                )}
-
-                {status.telegram_oauth && (
-                  <div className='flex justify-center my-2'>
-                    <TelegramLoginButton
-                      dataOnauth={onTelegramLoginClicked}
-                      botName={status.telegram_bot_name}
-                    />
-                  </div>
-                )}
-
-                <Divider margin='12px' align='center'>
-                  {t('或')}
-                </Divider>
-
-                <Button
-                  theme='solid'
-                  type='primary'
-                  className='w-full h-12 flex items-center justify-center bg-black text-white !rounded-full hover:bg-gray-800 transition-colors'
-                  icon={<IconMail size='large' />}
-                  onClick={handleEmailRegisterClick}
-                  loading={emailRegisterLoading}
-                >
-                  <span className='ml-3'>{t('使用 用户名 注册')}</span>
-                </Button>
-              </div>
+              <Button
+                theme='solid'
+                type='primary'
+                className='w-full h-12 flex items-center justify-center bg-black text-white !rounded-full hover:bg-gray-800 transition-colors'
+                icon={<IconMail size='large' />}
+                onClick={handleEmailRegisterClick}
+              >
+                <span className='ml-3'>{t('使用 用户名 注册')}</span>
+              </Button>
 
               <div className='mt-6 text-center text-sm'>
                 <Text>
@@ -619,29 +390,15 @@ const RegisterForm = () => {
                 </div>
               </Form>
 
-              {(status.github_oauth ||
-                status.oidc_enabled ||
-                status.wechat_login ||
-                status.linuxdo_oauth ||
-                status.telegram_oauth) && (
-                <>
-                  <Divider margin='12px' align='center'>
-                    {t('或')}
-                  </Divider>
+              <Divider margin='12px' align='center'>
+                {t('或')}
+              </Divider>
 
-                  <div className='mt-4 text-center'>
-                    <Button
-                      theme='outline'
-                      type='tertiary'
-                      className='w-full !rounded-full'
-                      onClick={handleOtherRegisterOptionsClick}
-                      loading={otherRegisterOptionsLoading}
-                    >
-                      {t('其他注册选项')}
-                    </Button>
-                  </div>
-                </>
-              )}
+              <OAuthButtons
+                loginChallenge={loginChallenge}
+                requireTermsAgreement={hasUserAgreement || hasPrivacyPolicy}
+                agreedToTerms={agreedToTerms}
+              />
 
               <div className='mt-6 text-center text-sm'>
                 <Text>
@@ -658,45 +415,6 @@ const RegisterForm = () => {
           </Card>
         </div>
       </div>
-    );
-  };
-
-  const renderWeChatLoginModal = () => {
-    return (
-      <Modal
-        title={t('微信扫码登录')}
-        visible={showWeChatLoginModal}
-        maskClosable={true}
-        onOk={onSubmitWeChatVerificationCode}
-        onCancel={() => setShowWeChatLoginModal(false)}
-        okText={t('登录')}
-        centered={true}
-        okButtonProps={{
-          loading: wechatCodeSubmitLoading,
-        }}
-      >
-        <div className='flex flex-col items-center'>
-          <img src={status.wechat_qrcode} alt='微信二维码' className='mb-4' />
-        </div>
-
-        <div className='text-center mb-4'>
-          <p>
-            {t('微信扫码关注公众号，输入「验证码」获取验证码（三分钟内有效）')}
-          </p>
-        </div>
-
-        <Form>
-          <Form.Input
-            field='wechat_verification_code'
-            placeholder={t('验证码')}
-            label={t('验证码')}
-            value={inputs.wechat_verification_code}
-            onChange={(value) =>
-              handleChange('wechat_verification_code', value)
-            }
-          />
-        </Form>
-      </Modal>
     );
   };
 
@@ -722,7 +440,6 @@ const RegisterForm = () => {
         )
           ? renderEmailRegisterForm()
           : renderOAuthOptions()}
-        {renderWeChatLoginModal()}
 
         {turnstileEnabled && (
           <div className='flex justify-center mt-6'>
