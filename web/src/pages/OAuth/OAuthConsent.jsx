@@ -309,7 +309,7 @@ const OAuthConsent = () => {
 
           <div className='px-4 py-4'>
             {/* Scope list */}
-            <div className='border border-gray-200 rounded-xl overflow-hidden'>
+            <div className='border border-gray-200 rounded-xl overflow-hidden max-h-[40vh] overflow-y-auto'>
               {consentInfo?.requested_scope?.map((scope, index) => {
                 const { name, desc, Icon, color } = getScopeInfo(scope);
                 const isLast = index === consentInfo.requested_scope.length - 1;
