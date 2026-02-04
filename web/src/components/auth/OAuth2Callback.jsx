@@ -45,7 +45,7 @@ const OAuth2Callback = (props) => {
         `/api/oauth/${props.type}?code=${code}&state=${state}`,
       );
 
-      const { success, message, data } = resData;
+      const { success, message, data, login_challenge } = resData;
 
       if (!success) {
         throw new Error(message || 'OAuth2 callback error');
@@ -60,7 +60,12 @@ const OAuth2Callback = (props) => {
         setUserData(data);
         updateAPI();
         showSuccess(t('登录成功！'));
-        navigate('/console/token');
+        // If there's a login_challenge, continue OAuth provider flow
+        if (login_challenge) {
+          navigate(`/oauth/login?login_challenge=${login_challenge}`);
+        } else {
+          navigate('/console/token');
+        }
       }
     } catch (error) {
       if (retry < MAX_RETRIES) {

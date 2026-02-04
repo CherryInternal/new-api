@@ -29,30 +29,25 @@ import {
   updateAPI,
   getSystemName,
   setUserData,
-  onGitHubOAuthClicked,
-  onOIDCClicked,
-  onLinuxDOOAuthClicked,
   prepareCredentialRequestOptions,
   buildAssertionResult,
   isPasskeySupported,
+  onGitHubOAuthClicked,
+  onOIDCClicked,
+  onLinuxDOOAuthClicked,
 } from '../../helpers';
 import Turnstile from 'react-turnstile';
 import { Button, Card, Checkbox, Divider, Form, Icon, Modal } from '@douyinfe/semi-ui';
 import Title from '@douyinfe/semi-ui/lib/es/typography/title';
 import Text from '@douyinfe/semi-ui/lib/es/typography/text';
-import TelegramLoginButton from 'react-telegram-login';
-
-import {
-  IconGithubLogo,
-  IconMail,
-  IconLock,
-  IconKey,
-} from '@douyinfe/semi-icons';
-import OIDCIcon from '../common/logo/OIDCIcon';
-import WeChatIcon from '../common/logo/WeChatIcon';
-import LinuxDoIcon from '../common/logo/LinuxDoIcon';
+import { IconMail, IconLock, IconKey, IconGithubLogo } from '@douyinfe/semi-icons';
 import TwoFAVerification from './TwoFAVerification';
+import OAuthButtons from './OAuthButtons';
 import { useTranslation } from 'react-i18next';
+import TelegramLoginButton from 'react-telegram-login';
+import WeChatIcon from '../common/logo/WeChatIcon';
+import OIDCIcon from '../common/logo/OIDCIcon';
+import LinuxDoIcon from '../common/logo/LinuxDoIcon';
 
 const LoginForm = () => {
   let navigate = useNavigate();
@@ -70,7 +65,7 @@ const LoginForm = () => {
   const [turnstileSiteKey, setTurnstileSiteKey] = useState('');
   const [turnstileToken, setTurnstileToken] = useState('');
   const [showWeChatLoginModal, setShowWeChatLoginModal] = useState(false);
-  const [showEmailLogin, setShowEmailLogin] = useState(false);
+  const [showEmailLogin, setShowEmailLogin] = useState(true);
   const [wechatLoading, setWechatLoading] = useState(false);
   const [githubLoading, setGithubLoading] = useState(false);
   const [oidcLoading, setOidcLoading] = useState(false);
@@ -713,29 +708,14 @@ const LoginForm = () => {
                 </div>
               </Form>
 
-              {(status.github_oauth ||
-                status.oidc_enabled ||
-                status.wechat_login ||
-                status.linuxdo_oauth ||
-                status.telegram_oauth) && (
-                <>
-                  <Divider margin='12px' align='center'>
-                    {t('或')}
-                  </Divider>
+              <Divider margin='12px' align='center'>
+                {t('或')}
+              </Divider>
 
-                  <div className='mt-4 text-center'>
-                    <Button
-                      theme='outline'
-                      type='tertiary'
-                      className='w-full !rounded-full'
-                      onClick={handleOtherLoginOptionsClick}
-                      loading={otherLoginOptionsLoading}
-                    >
-                      {t('其他登录选项')}
-                    </Button>
-                  </div>
-                </>
-              )}
+              <OAuthButtons
+                requireTermsAgreement={hasUserAgreement || hasPrivacyPolicy}
+                agreedToTerms={agreedToTerms}
+              />
 
               {!status.self_use_mode_enabled && (
                 <div className='mt-6 text-center text-sm'>

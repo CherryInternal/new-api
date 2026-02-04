@@ -19,12 +19,13 @@ For commercial licensing, please contact support@quantumnous.com
 
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Button, Card, Form, Spin, Tag } from '@douyinfe/semi-ui';
+import { Button, Card, Divider, Form, Spin, Tag } from '@douyinfe/semi-ui';
 import { IconLock, IconMail } from '@douyinfe/semi-icons';
 import Title from '@douyinfe/semi-ui/lib/es/typography/title';
 import Text from '@douyinfe/semi-ui/lib/es/typography/text';
 import { useTranslation } from 'react-i18next';
 import { API, getLogo, getSystemName, showError } from '../../helpers';
+import OAuthButtons from '../../components/auth/OAuthButtons';
 
 // Scope descriptions mapping
 const SCOPE_DESCRIPTIONS = {
@@ -307,6 +308,12 @@ const OAuthLogin = () => {
                 {t('登录')}
               </Button>
             </Form>
+
+            <Divider margin='12px' align='center'>
+              {t('或')}
+            </Divider>
+
+            <OAuthButtons loginChallenge={challenge} />
 
             {clientInfo?.requested_scope && clientInfo.requested_scope.length > 0 && (
               <div className='mt-6 pt-4 border-t border-gray-200'>

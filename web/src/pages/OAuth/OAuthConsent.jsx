@@ -101,29 +101,11 @@ const OAuthConsent = () => {
   const challenge = searchParams.get('consent_challenge');
   const isEnglish = i18n.language === 'en';
 
-  // Check if URL is a custom URI scheme (not http/https)
-  const isCustomScheme = (url) => {
-    if (!url) return false;
-    try {
-      const parsed = new URL(url);
-      return !['http:', 'https:'].includes(parsed.protocol);
-    } catch {
-      return false;
-    }
-  };
-
-  // Handle redirect - for custom URI schemes, show completion message
+  // Handle redirect - always redirect in current tab to avoid security warnings
   const handleRedirect = (redirectTo) => {
     setRedirectTarget(redirectTo || '');
     setRedirectComplete(true);
-    if (isCustomScheme(redirectTo)) {
-      window.location.href = redirectTo;
-      return;
-    }
-    const newWindow = window.open(redirectTo, '_blank', 'noopener,noreferrer');
-    if (!newWindow) {
-      window.location.assign(redirectTo);
-    }
+    window.location.href = redirectTo;
   };
 
   // Fetch consent info on mount
@@ -327,7 +309,7 @@ const OAuthConsent = () => {
 
           <div className='px-4 py-4'>
             {/* Scope list */}
-            <div className='border border-gray-200 rounded-xl overflow-hidden'>
+            <div className='border border-gray-200 rounded-xl overflow-hidden max-h-[40vh] overflow-y-auto'>
               {consentInfo?.requested_scope?.map((scope, index) => {
                 const { name, desc, Icon, color } = getScopeInfo(scope);
                 const isLast = index === consentInfo.requested_scope.length - 1;
