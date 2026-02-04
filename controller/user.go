@@ -99,6 +99,12 @@ func Login(c *gin.Context) {
 // setup session & cookies and then return user info
 func setupLogin(user *model.User, c *gin.Context) {
 	session := sessions.Default(c)
+	// Get and clear OAuth login challenge if present (for OAuth provider flow)
+	var loginChallenge string
+	if challenge := session.Get("oauth_login_challenge"); challenge != nil {
+		loginChallenge = challenge.(string)
+		session.Delete("oauth_login_challenge")
+	}
 	session.Set("id", user.Id)
 	session.Set("username", user.Username)
 	session.Set("role", user.Role)
@@ -120,11 +126,16 @@ func setupLogin(user *model.User, c *gin.Context) {
 		Status:      user.Status,
 		Group:       user.Group,
 	}
-	c.JSON(http.StatusOK, gin.H{
+	response := gin.H{
 		"message": "",
 		"success": true,
 		"data":    cleanUser,
-	})
+	}
+	// Include login_challenge for OAuth provider flow continuation
+	if loginChallenge != "" {
+		response["login_challenge"] = loginChallenge
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 func Logout(c *gin.Context) {

@@ -226,6 +226,13 @@ func GenerateOAuthCode(c *gin.Context) {
 	if affCode != "" {
 		session.Set("aff", affCode)
 	}
+	// Store login_challenge for OAuth provider flow continuation
+	loginChallenge := c.Query("login_challenge")
+	if loginChallenge != "" {
+		session.Set("oauth_login_challenge", loginChallenge)
+	} else {
+		session.Delete("oauth_login_challenge")
+	}
 	session.Set("oauth_state", state)
 	err := session.Save()
 	if err != nil {
