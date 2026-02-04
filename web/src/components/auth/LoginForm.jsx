@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { UserContext } from '../../context/User';
 import {
@@ -32,15 +32,22 @@ import {
   prepareCredentialRequestOptions,
   buildAssertionResult,
   isPasskeySupported,
+  onGitHubOAuthClicked,
+  onOIDCClicked,
+  onLinuxDOOAuthClicked,
 } from '../../helpers';
 import Turnstile from 'react-turnstile';
-import { Button, Card, Checkbox, Divider, Form, Modal } from '@douyinfe/semi-ui';
+import { Button, Card, Checkbox, Divider, Form, Icon, Modal } from '@douyinfe/semi-ui';
 import Title from '@douyinfe/semi-ui/lib/es/typography/title';
 import Text from '@douyinfe/semi-ui/lib/es/typography/text';
-import { IconMail, IconLock, IconKey } from '@douyinfe/semi-icons';
+import { IconMail, IconLock, IconKey, IconGithubLogo } from '@douyinfe/semi-icons';
 import TwoFAVerification from './TwoFAVerification';
 import OAuthButtons from './OAuthButtons';
 import { useTranslation } from 'react-i18next';
+import TelegramLoginButton from 'react-telegram-login';
+import WeChatIcon from '../common/logo/WeChatIcon';
+import OIDCIcon from '../common/logo/OIDCIcon';
+import LinuxDoIcon from '../common/logo/LinuxDoIcon';
 
 const LoginForm = () => {
   let navigate = useNavigate();
