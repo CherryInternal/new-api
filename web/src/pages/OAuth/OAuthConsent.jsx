@@ -20,7 +20,7 @@ For commercial licensing, please contact support@quantumnous.com
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button, Card, Spin } from '@douyinfe/semi-ui';
-import { IconTickCircle, IconUser, IconMail, IconCoinMoneyStroked, IconHistogram, IconKey } from '@douyinfe/semi-icons';
+import { IconTickCircle, IconUser, IconMail, IconCoinMoneyStroked, IconHistogram, IconKey, IconRefresh2 } from '@douyinfe/semi-icons';
 import Title from '@douyinfe/semi-ui/lib/es/typography/title';
 import Text from '@douyinfe/semi-ui/lib/es/typography/text';
 import { useTranslation } from 'react-i18next';
@@ -83,6 +83,14 @@ const SCOPE_DESCRIPTIONS = {
     descEn: 'Create and delete API tokens',
     icon: IconKey,
     color: 'text-red-500',
+  },
+  offline_access: {
+    name: '离线访问',
+    desc: '保持登录状态并刷新令牌',
+    nameEn: 'Offline Access',
+    descEn: 'Stay logged in and refresh tokens',
+    icon: IconRefresh2,
+    color: 'text-indigo-500',
   },
 };
 

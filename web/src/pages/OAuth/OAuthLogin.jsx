@@ -36,6 +36,7 @@ const SCOPE_DESCRIPTIONS = {
   'usage:read': { name: '使用记录', desc: '查看您的 API 使用记录', nameEn: 'Usage', descEn: 'View your API usage records' },
   'tokens:read': { name: '令牌查看', desc: '查看您的 API 令牌列表', nameEn: 'Tokens (Read)', descEn: 'View your API token list' },
   'tokens:write': { name: '令牌管理', desc: '创建和删除 API 令牌', nameEn: 'Tokens (Write)', descEn: 'Create and delete API tokens' },
+  offline_access: { name: '离线访问', desc: '保持登录状态并刷新令牌', nameEn: 'Offline Access', descEn: 'Stay logged in and refresh tokens' },
 };
 
 const OAuthLogin = () => {
