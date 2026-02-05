@@ -136,17 +136,15 @@ const OAuthConsent = () => {
     return false;
   };
 
-  // Handle redirect - for custom protocols, show manual button to avoid Chrome security warnings
+  // Handle redirect - navigate immediately, fallback page only if navigation fails
   const handleRedirect = (redirectTo) => {
+    // Set fallback state first (shown only if navigation doesn't work)
     setRedirectTarget(redirectTo || '');
     setRedirectComplete(true);
 
-    // Don't auto-redirect if the URL has a custom protocol redirect_uri
-    // Chrome blocks 302 redirects from HTTPS to custom protocols without user gesture
-    // Instead, show the "打开应用" button for user to click (user gesture = no warning)
-    if (!isCustomProtocol(redirectTo) && !hasCustomProtocolRedirectUri(redirectTo)) {
-      window.location.href = redirectTo;
-    }
+    // Always navigate immediately - the user gesture from clicking "授权" should
+    // carry through to Hydra's 302 redirect to the custom protocol
+    window.location.href = redirectTo;
   };
 
   // Fetch consent info on mount
