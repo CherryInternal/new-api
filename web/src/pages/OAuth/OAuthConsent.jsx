@@ -112,12 +112,16 @@ const OAuthConsent = () => {
   // Check if URL is a custom protocol (not http/https)
   const isCustomProtocol = (url) => {
     if (!url) return false;
-    try {
-      const parsed = new URL(url);
-      return parsed.protocol !== 'http:' && parsed.protocol !== 'https:';
-    } catch {
+    // Use string-based check as primary method (more reliable across browsers)
+    const lowerUrl = url.toLowerCase();
+    if (lowerUrl.startsWith('http://') || lowerUrl.startsWith('https://')) {
       return false;
     }
+    // Check if it looks like a protocol URL (has :// or starts with protocol:)
+    if (url.includes('://') || /^[a-z][a-z0-9+.-]*:/i.test(url)) {
+      return true;
+    }
+    return false;
   };
 
   // Handle redirect - for custom protocols, show manual button instead of auto-redirect
