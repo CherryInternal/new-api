@@ -112,14 +112,26 @@ const OAuthConsent = () => {
   // Check if URL is a custom protocol (not http/https)
   const isCustomProtocol = (url) => {
     if (!url) return false;
-    // Use string-based check as primary method (more reliable across browsers)
-    const lowerUrl = url.toLowerCase();
-    if (lowerUrl.startsWith('http://') || lowerUrl.startsWith('https://')) {
+    try {
+      const parsed = new URL(url);
+      return parsed.protocol !== 'http:' && parsed.protocol !== 'https:';
+    } catch {
       return false;
     }
-    // Check if it looks like a protocol URL (has :// or starts with protocol:)
-    if (url.includes('://') || /^[a-z][a-z0-9+.-]*:/i.test(url)) {
-      return true;
+  };
+
+  // Check if a Hydra redirect URL contains a custom protocol redirect_uri
+  // e.g., https://domain/oauth2/auth?redirect_uri=cherrystudio://...
+  const hasCustomProtocolRedirectUri = (url) => {
+    if (!url) return false;
+    try {
+      const parsed = new URL(url);
+      const redirectUri = parsed.searchParams.get('redirect_uri');
+      if (redirectUri) {
+        return isCustomProtocol(redirectUri);
+      }
+    } catch {
+      // Ignore parsing errors
     }
     return false;
   };
@@ -129,9 +141,11 @@ const OAuthConsent = () => {
     setRedirectTarget(redirectTo || '');
     setRedirectComplete(true);
 
-    // For custom protocols (like cherrystudio://), don't auto-redirect
-    // This avoids Chrome's "insecure connection" warning
-    if (!isCustomProtocol(redirectTo)) {
+    // Don't auto-redirect if:
+    // 1. The URL itself is a custom protocol (e.g., cherrystudio://...)
+    // 2. The URL is a Hydra URL with a custom protocol redirect_uri
+    //    (Chrome blocks 302 redirects from HTTPS to custom protocols)
+    if (!isCustomProtocol(redirectTo) && !hasCustomProtocolRedirectUri(redirectTo)) {
       window.location.href = redirectTo;
     }
   };
@@ -276,7 +290,9 @@ const OAuthConsent = () => {
 
   // Render redirect complete state
   if (redirectComplete) {
-    const isCustomUrl = isCustomProtocol(redirectTarget);
+    // Check if we need to show manual redirect button
+    // Either the URL itself is a custom protocol, or it's a Hydra URL with custom protocol redirect_uri
+    const needsManualRedirect = isCustomProtocol(redirectTarget) || hasCustomProtocolRedirectUri(redirectTarget);
 
     return (
       <div className='relative overflow-hidden bg-gray-100 flex items-center justify-center min-h-screen py-12 px-4'>
@@ -296,12 +312,12 @@ const OAuthConsent = () => {
                 {t('授权完成')}
               </Title>
               <Text className='text-gray-500 text-center'>
-                {isCustomUrl
+                {needsManualRedirect
                   ? t('请点击下方按钮返回应用')
                   : t('已发起跳转，请返回应用完成登录')}
               </Text>
               {redirectTarget && (
-                isCustomUrl ? (
+                needsManualRedirect ? (
                   // Use anchor tag for custom protocols to properly trigger browser's protocol handler
                   <a
                     href={redirectTarget}
