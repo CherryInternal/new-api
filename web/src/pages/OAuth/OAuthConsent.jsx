@@ -101,11 +101,27 @@ const OAuthConsent = () => {
   const challenge = searchParams.get('consent_challenge');
   const isEnglish = i18n.language === 'en';
 
-  // Handle redirect - always redirect in current tab to avoid security warnings
+  // Check if URL is a custom protocol (not http/https)
+  const isCustomProtocol = (url) => {
+    if (!url) return false;
+    try {
+      const parsed = new URL(url);
+      return parsed.protocol !== 'http:' && parsed.protocol !== 'https:';
+    } catch {
+      return false;
+    }
+  };
+
+  // Handle redirect - for custom protocols, show manual button instead of auto-redirect
   const handleRedirect = (redirectTo) => {
     setRedirectTarget(redirectTo || '');
     setRedirectComplete(true);
-    window.location.href = redirectTo;
+
+    // For custom protocols (like cherrystudio://), don't auto-redirect
+    // This avoids Chrome's "insecure connection" warning
+    if (!isCustomProtocol(redirectTo)) {
+      window.location.href = redirectTo;
+    }
   };
 
   // Fetch consent info on mount
@@ -248,6 +264,8 @@ const OAuthConsent = () => {
 
   // Render redirect complete state
   if (redirectComplete) {
+    const isCustomUrl = isCustomProtocol(redirectTarget);
+
     return (
       <div className='relative overflow-hidden bg-gray-100 flex items-center justify-center min-h-screen py-12 px-4'>
         <div className='blur-ball blur-ball-indigo' style={{ top: '-80px', right: '-80px' }} />
@@ -266,7 +284,9 @@ const OAuthConsent = () => {
                 {t('授权完成')}
               </Title>
               <Text className='text-gray-500 text-center'>
-                {t('已发起跳转，请返回应用完成登录')}
+                {isCustomUrl
+                  ? t('请点击下方按钮返回应用')
+                  : t('已发起跳转，请返回应用完成登录')}
               </Text>
               {redirectTarget && (
                 <Button
@@ -275,7 +295,7 @@ const OAuthConsent = () => {
                   className='!rounded-full mt-6'
                   onClick={() => window.location.assign(redirectTarget)}
                 >
-                  {t('如果未自动跳转，请点击继续')}
+                  {isCustomUrl ? t('打开应用') : t('如果未自动跳转，请点击继续')}
                 </Button>
               )}
             </div>
