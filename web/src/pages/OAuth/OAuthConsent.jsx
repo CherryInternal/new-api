@@ -120,14 +120,32 @@ const OAuthConsent = () => {
     }
   };
 
+  // Check if a Hydra redirect URL contains a custom protocol redirect_uri
+  // e.g., https://domain/oauth2/auth?redirect_uri=cherrystudio://...
+  const hasCustomProtocolRedirectUri = (url) => {
+    if (!url) return false;
+    try {
+      const parsed = new URL(url);
+      const redirectUri = parsed.searchParams.get('redirect_uri');
+      if (redirectUri) {
+        return isCustomProtocol(redirectUri);
+      }
+    } catch {
+      // Ignore parsing errors
+    }
+    return false;
+  };
+
   // Handle redirect - for custom protocols, show manual button instead of auto-redirect
   const handleRedirect = (redirectTo) => {
     setRedirectTarget(redirectTo || '');
     setRedirectComplete(true);
 
-    // For custom protocols (like cherrystudio://), don't auto-redirect
-    // This avoids Chrome's "insecure connection" warning
-    if (!isCustomProtocol(redirectTo)) {
+    // Don't auto-redirect if:
+    // 1. The URL itself is a custom protocol (e.g., cherrystudio://...)
+    // 2. The URL is a Hydra URL with a custom protocol redirect_uri
+    //    (Chrome blocks 302 redirects from HTTPS to custom protocols)
+    if (!isCustomProtocol(redirectTo) && !hasCustomProtocolRedirectUri(redirectTo)) {
       window.location.href = redirectTo;
     }
   };
@@ -272,7 +290,9 @@ const OAuthConsent = () => {
 
   // Render redirect complete state
   if (redirectComplete) {
-    const isCustomUrl = isCustomProtocol(redirectTarget);
+    // Check if we need to show manual redirect button
+    // Either the URL itself is a custom protocol, or it's a Hydra URL with custom protocol redirect_uri
+    const needsManualRedirect = isCustomProtocol(redirectTarget) || hasCustomProtocolRedirectUri(redirectTarget);
 
     return (
       <div className='relative overflow-hidden bg-gray-100 flex items-center justify-center min-h-screen py-12 px-4'>
@@ -292,19 +312,29 @@ const OAuthConsent = () => {
                 {t('授权完成')}
               </Title>
               <Text className='text-gray-500 text-center'>
-                {isCustomUrl
+                {needsManualRedirect
                   ? t('请点击下方按钮返回应用')
                   : t('已发起跳转，请返回应用完成登录')}
               </Text>
               {redirectTarget && (
-                <Button
-                  theme='solid'
-                  type='primary'
-                  className='!rounded-full mt-6'
-                  onClick={() => window.location.assign(redirectTarget)}
-                >
-                  {isCustomUrl ? t('打开应用') : t('如果未自动跳转，请点击继续')}
-                </Button>
+                needsManualRedirect ? (
+                  // Use anchor tag for custom protocols to properly trigger browser's protocol handler
+                  <a
+                    href={redirectTarget}
+                    className='semi-button semi-button-primary semi-button-solid !rounded-full mt-6 px-6 py-2 inline-block text-center no-underline'
+                  >
+                    {t('打开应用')}
+                  </a>
+                ) : (
+                  <Button
+                    theme='solid'
+                    type='primary'
+                    className='!rounded-full mt-6'
+                    onClick={() => window.location.assign(redirectTarget)}
+                  >
+                    {t('如果未自动跳转，请点击继续')}
+                  </Button>
+                )
               )}
             </div>
           </Card>
