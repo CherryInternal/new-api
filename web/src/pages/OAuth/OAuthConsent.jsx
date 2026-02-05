@@ -136,18 +136,18 @@ const OAuthConsent = () => {
     return false;
   };
 
-  // Handle redirect - for custom protocols, show manual button instead of auto-redirect
+  // Handle redirect - always try to navigate, fallback page shown if blocked
   const handleRedirect = (redirectTo) => {
+    // Set fallback state first (in case navigation is blocked)
     setRedirectTarget(redirectTo || '');
     setRedirectComplete(true);
 
-    // Don't auto-redirect if:
-    // 1. The URL itself is a custom protocol (e.g., cherrystudio://...)
-    // 2. The URL is a Hydra URL with a custom protocol redirect_uri
-    //    (Chrome blocks 302 redirects from HTTPS to custom protocols)
-    if (!isCustomProtocol(redirectTo) && !hasCustomProtocolRedirectUri(redirectTo)) {
-      window.location.href = redirectTo;
-    }
+    // Always try to navigate immediately
+    // For regular URLs: browser navigates away
+    // For custom protocols or Hydra URLs with custom redirect_uri:
+    //   - If successful: app opens and user leaves the page
+    //   - If blocked by Chrome: fallback page is already rendered with "打开应用" button
+    window.location.href = redirectTo;
   };
 
   // Fetch consent info on mount
