@@ -114,6 +114,7 @@ func OAuthGetUsage(c *gin.Context) {
 
 // OAuthListTokens returns user's API tokens for OAuth clients
 // Scope required: tokens:read
+// Returns tokens in the "default" group. If no default group tokens exist, creates one.
 func OAuthListTokens(c *gin.Context) {
 	userId, ok := getUserFromContext(c)
 	if !ok {
@@ -121,7 +122,10 @@ func OAuthListTokens(c *gin.Context) {
 		return
 	}
 
-	tokens, err := model.GetAllUserTokens(userId, 0, 100)
+	const defaultGroup = "default"
+
+	// Get tokens in the default group
+	tokens, err := model.GetUserTokensByGroup(userId, defaultGroup)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -130,7 +134,40 @@ func OAuthListTokens(c *gin.Context) {
 		return
 	}
 
-	// Hide sensitive key data
+	// If no tokens in default group, create one
+	if len(tokens) == 0 {
+		key, err := common.GenerateKey()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"message": "failed to generate token key",
+			})
+			return
+		}
+
+		token := &model.Token{
+			UserId:         userId,
+			Name:           "Default Token",
+			Key:            key,
+			CreatedTime:    common.GetTimestamp(),
+			AccessedTime:   common.GetTimestamp(),
+			ExpiredTime:    -1,
+			UnlimitedQuota: false,
+			Group:          defaultGroup,
+		}
+
+		if err := token.Insert(); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"message": "failed to create default token",
+			})
+			return
+		}
+
+		tokens = []*model.Token{token}
+	}
+
+	// Return tokens data
 	safeTokens := make([]gin.H, 0, len(tokens))
 	for _, t := range tokens {
 		safeTokens = append(safeTokens, gin.H{
@@ -190,7 +227,7 @@ func OAuthCreateToken(c *gin.Context) {
 		return
 	}
 
-	// Create token with default settings
+	// Create token with default settings in the default group
 	token := &model.Token{
 		UserId:         userId,
 		Name:           req.Name,
@@ -199,6 +236,7 @@ func OAuthCreateToken(c *gin.Context) {
 		AccessedTime:   common.GetTimestamp(),
 		ExpiredTime:    -1, // Never expires
 		UnlimitedQuota: false,
+		Group:          "default",
 	}
 
 	err = token.Insert()
