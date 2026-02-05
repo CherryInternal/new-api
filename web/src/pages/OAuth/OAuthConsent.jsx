@@ -297,14 +297,24 @@ const OAuthConsent = () => {
                   : t('已发起跳转，请返回应用完成登录')}
               </Text>
               {redirectTarget && (
-                <Button
-                  theme='solid'
-                  type='primary'
-                  className='!rounded-full mt-6'
-                  onClick={() => window.location.assign(redirectTarget)}
-                >
-                  {isCustomUrl ? t('打开应用') : t('如果未自动跳转，请点击继续')}
-                </Button>
+                isCustomUrl ? (
+                  // Use anchor tag for custom protocols to properly trigger browser's protocol handler
+                  <a
+                    href={redirectTarget}
+                    className='semi-button semi-button-primary semi-button-solid !rounded-full mt-6 px-6 py-2 inline-block text-center no-underline'
+                  >
+                    {t('打开应用')}
+                  </a>
+                ) : (
+                  <Button
+                    theme='solid'
+                    type='primary'
+                    className='!rounded-full mt-6'
+                    onClick={() => window.location.assign(redirectTarget)}
+                  >
+                    {t('如果未自动跳转，请点击继续')}
+                  </Button>
+                )
               )}
             </div>
           </Card>
