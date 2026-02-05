@@ -109,18 +109,7 @@ const OAuthConsent = () => {
   const challenge = searchParams.get('consent_challenge');
   const isEnglish = i18n.language === 'en';
 
-  // Check if URL is a custom protocol (not http/https)
-  const isCustomProtocol = (url) => {
-    if (!url) return false;
-    try {
-      const parsed = new URL(url);
-      return parsed.protocol !== 'http:' && parsed.protocol !== 'https:';
-    } catch {
-      return false;
-    }
-  };
-
-  // Handle redirect - for custom protocols, show manual button instead of auto-redirect
+  // Handle redirect - navigate immediately, fallback page only if navigation fails
   const handleRedirect = (redirectTo) => {
     setRedirectTarget(redirectTo || '');
     setRedirectComplete(true);
@@ -272,8 +261,6 @@ const OAuthConsent = () => {
 
   // Render redirect complete state
   if (redirectComplete) {
-    const isCustomUrl = isCustomProtocol(redirectTarget);
-
     return (
       <div className='relative overflow-hidden bg-gray-100 flex items-center justify-center min-h-screen py-12 px-4'>
         <div className='blur-ball blur-ball-indigo' style={{ top: '-80px', right: '-80px' }} />
@@ -292,18 +279,16 @@ const OAuthConsent = () => {
                 {t('授权完成')}
               </Title>
               <Text className='text-gray-500 text-center'>
-                {isCustomUrl
-                  ? t('请点击下方按钮返回应用')
-                  : t('已发起跳转，请返回应用完成登录')}
+                {t('正在返回应用，请稍候...')}
               </Text>
               {redirectTarget && (
                 <Button
                   theme='solid'
                   type='primary'
                   className='!rounded-full mt-6'
-                  onClick={() => window.location.assign(redirectTarget)}
+                  onClick={() => window.location.href = redirectTarget}
                 >
-                  {isCustomUrl ? t('打开应用') : t('如果未自动跳转，请点击继续')}
+                  {t('如未自动跳转，点击返回')}
                 </Button>
               )}
             </div>
