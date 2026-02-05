@@ -20,7 +20,7 @@ For commercial licensing, please contact support@quantumnous.com
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button, Card, Spin } from '@douyinfe/semi-ui';
-import { IconTickCircle, IconUser, IconMail, IconCoinMoneyStroked, IconHistogram, IconKey } from '@douyinfe/semi-icons';
+import { IconTickCircle, IconUser, IconMail, IconCoinMoneyStroked, IconHistogram, IconKey, IconRefresh2 } from '@douyinfe/semi-icons';
 import Title from '@douyinfe/semi-ui/lib/es/typography/title';
 import Text from '@douyinfe/semi-ui/lib/es/typography/text';
 import { useTranslation } from 'react-i18next';
@@ -84,6 +84,14 @@ const SCOPE_DESCRIPTIONS = {
     icon: IconKey,
     color: 'text-red-500',
   },
+  offline_access: {
+    name: '离线访问',
+    desc: '保持登录状态并刷新令牌',
+    nameEn: 'Offline Access',
+    descEn: 'Stay logged in and refresh tokens',
+    icon: IconRefresh2,
+    color: 'text-indigo-500',
+  },
 };
 
 const OAuthConsent = () => {
@@ -101,11 +109,27 @@ const OAuthConsent = () => {
   const challenge = searchParams.get('consent_challenge');
   const isEnglish = i18n.language === 'en';
 
-  // Handle redirect - always redirect in current tab to avoid security warnings
+  // Check if URL is a custom protocol (not http/https)
+  const isCustomProtocol = (url) => {
+    if (!url) return false;
+    try {
+      const parsed = new URL(url);
+      return parsed.protocol !== 'http:' && parsed.protocol !== 'https:';
+    } catch {
+      return false;
+    }
+  };
+
+  // Handle redirect - for custom protocols, show manual button instead of auto-redirect
   const handleRedirect = (redirectTo) => {
     setRedirectTarget(redirectTo || '');
     setRedirectComplete(true);
-    window.location.href = redirectTo;
+
+    // For custom protocols (like cherrystudio://), don't auto-redirect
+    // This avoids Chrome's "insecure connection" warning
+    if (!isCustomProtocol(redirectTo)) {
+      window.location.href = redirectTo;
+    }
   };
 
   // Fetch consent info on mount
@@ -248,6 +272,8 @@ const OAuthConsent = () => {
 
   // Render redirect complete state
   if (redirectComplete) {
+    const isCustomUrl = isCustomProtocol(redirectTarget);
+
     return (
       <div className='relative overflow-hidden bg-gray-100 flex items-center justify-center min-h-screen py-12 px-4'>
         <div className='blur-ball blur-ball-indigo' style={{ top: '-80px', right: '-80px' }} />
@@ -266,7 +292,9 @@ const OAuthConsent = () => {
                 {t('授权完成')}
               </Title>
               <Text className='text-gray-500 text-center'>
-                {t('已发起跳转，请返回应用完成登录')}
+                {isCustomUrl
+                  ? t('请点击下方按钮返回应用')
+                  : t('已发起跳转，请返回应用完成登录')}
               </Text>
               {redirectTarget && (
                 <Button
@@ -275,7 +303,7 @@ const OAuthConsent = () => {
                   className='!rounded-full mt-6'
                   onClick={() => window.location.assign(redirectTarget)}
                 >
-                  {t('如果未自动跳转，请点击继续')}
+                  {isCustomUrl ? t('打开应用') : t('如果未自动跳转，请点击继续')}
                 </Button>
               )}
             </div>
