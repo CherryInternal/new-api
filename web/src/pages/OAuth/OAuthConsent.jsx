@@ -109,41 +109,13 @@ const OAuthConsent = () => {
   const challenge = searchParams.get('consent_challenge');
   const isEnglish = i18n.language === 'en';
 
-  // Check if URL is a custom protocol (not http/https)
-  const isCustomProtocol = (url) => {
-    if (!url) return false;
-    try {
-      const parsed = new URL(url);
-      return parsed.protocol !== 'http:' && parsed.protocol !== 'https:';
-    } catch {
-      return false;
-    }
-  };
-
-  // Check if a Hydra redirect URL contains a custom protocol redirect_uri
-  // e.g., https://domain/oauth2/auth?redirect_uri=cherrystudio://...
-  const hasCustomProtocolRedirectUri = (url) => {
-    if (!url) return false;
-    try {
-      const parsed = new URL(url);
-      const redirectUri = parsed.searchParams.get('redirect_uri');
-      if (redirectUri) {
-        return isCustomProtocol(redirectUri);
-      }
-    } catch {
-      // Ignore parsing errors
-    }
-    return false;
-  };
-
   // Handle redirect - navigate immediately, fallback page only if navigation fails
   const handleRedirect = (redirectTo) => {
     // Set fallback state first (shown only if navigation doesn't work)
     setRedirectTarget(redirectTo || '');
     setRedirectComplete(true);
 
-    // Always navigate immediately - the user gesture from clicking "授权" should
-    // carry through to Hydra's 302 redirect to the custom protocol
+    // Always navigate immediately
     window.location.href = redirectTo;
   };
 
@@ -287,10 +259,6 @@ const OAuthConsent = () => {
 
   // Render redirect complete state
   if (redirectComplete) {
-    // Check if we need to show manual redirect button
-    // Either the URL itself is a custom protocol, or it's a Hydra URL with custom protocol redirect_uri
-    const needsManualRedirect = isCustomProtocol(redirectTarget) || hasCustomProtocolRedirectUri(redirectTarget);
-
     return (
       <div className='relative overflow-hidden bg-gray-100 flex items-center justify-center min-h-screen py-12 px-4'>
         <div className='blur-ball blur-ball-indigo' style={{ top: '-80px', right: '-80px' }} />
@@ -309,29 +277,17 @@ const OAuthConsent = () => {
                 {t('授权完成')}
               </Title>
               <Text className='text-gray-500 text-center'>
-                {needsManualRedirect
-                  ? t('请点击下方按钮返回应用')
-                  : t('已发起跳转，请返回应用完成登录')}
+                {t('正在返回应用，请稍候...')}
               </Text>
               {redirectTarget && (
-                needsManualRedirect ? (
-                  // Use anchor tag for custom protocols to properly trigger browser's protocol handler
-                  <a
-                    href={redirectTarget}
-                    className='semi-button semi-button-primary semi-button-solid !rounded-full mt-6 px-6 py-2 inline-block text-center no-underline'
-                  >
-                    {t('打开应用')}
-                  </a>
-                ) : (
-                  <Button
-                    theme='solid'
-                    type='primary'
-                    className='!rounded-full mt-6'
-                    onClick={() => window.location.assign(redirectTarget)}
-                  >
-                    {t('如果未自动跳转，请点击继续')}
-                  </Button>
-                )
+                <Button
+                  theme='solid'
+                  type='primary'
+                  className='!rounded-full mt-6'
+                  onClick={() => window.location.href = redirectTarget}
+                >
+                  {t('如未自动跳转，点击返回')}
+                </Button>
               )}
             </div>
           </Card>
