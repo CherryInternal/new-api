@@ -63,6 +63,13 @@ func GetAllUserTokens(userId int, startIdx int, num int) ([]*Token, error) {
 	return tokens, err
 }
 
+// GetUserTokensByGroup returns all tokens for a user with the specified group
+func GetUserTokensByGroup(userId int, group string) ([]*Token, error) {
+	var tokens []*Token
+	err := DB.Where("user_id = ? AND `group` = ?", userId, group).Order("id desc").Find(&tokens).Error
+	return tokens, err
+}
+
 func SearchUserTokens(userId int, keyword string, token string) (tokens []*Token, err error) {
 	if token != "" {
 		token = strings.Trim(token, "sk-")
