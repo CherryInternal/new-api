@@ -152,7 +152,7 @@ func OAuthListTokens(c *gin.Context) {
 			CreatedTime:    common.GetTimestamp(),
 			AccessedTime:   common.GetTimestamp(),
 			ExpiredTime:    -1,
-			UnlimitedQuota: false,
+			UnlimitedQuota: true,
 			Group:          defaultGroup,
 		}
 
