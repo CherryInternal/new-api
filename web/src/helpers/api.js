@@ -236,8 +236,8 @@ export async function getOAuthState(loginChallenge = null) {
   }
 }
 
-async function prepareOAuthState(options = {}) {
-  const { shouldLogout = false } = options;
+async function prepareOAuthState(loginChallenge = null, options = {}) {
+  const { shouldLogout = false } = options || {};
   if (shouldLogout) {
     try {
       await API.get('/api/user/logout', { skipErrorHandler: true });
@@ -308,11 +308,12 @@ export async function onLinuxDOOAuthClicked(
  * @param {string} provider.client_id - OAuth client ID
  * @param {string} provider.authorization_endpoint - Authorization URL
  * @param {string} provider.scopes - OAuth scopes (space-separated)
+ * @param {string|null} loginChallenge - Hydra login challenge
  * @param {Object} options - Options
  * @param {boolean} options.shouldLogout - Whether to logout first
  */
-export async function onCustomOAuthClicked(provider, options = {}) {
-  const state = await prepareOAuthState(options);
+export async function onCustomOAuthClicked(provider, loginChallenge = null, options = {}) {
+  const state = await prepareOAuthState(loginChallenge, options);
   if (!state) return;
 
   try {
