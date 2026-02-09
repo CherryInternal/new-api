@@ -38,9 +38,6 @@ import {
   onOIDCClicked,
   onLinuxDOOAuthClicked,
   onCustomOAuthClicked,
-  prepareCredentialRequestOptions,
-  buildAssertionResult,
-  isPasskeySupported,
 } from '../../helpers';
 import Turnstile from 'react-turnstile';
 import {
@@ -62,8 +59,6 @@ import TelegramLoginButton from 'react-telegram-login';
 import WeChatIcon from '../common/logo/WeChatIcon';
 import OIDCIcon from '../common/logo/OIDCIcon';
 import LinuxDoIcon from '../common/logo/LinuxDoIcon';
-import TwoFAVerification from './TwoFAVerification';
-import { useTranslation } from 'react-i18next';
 import { SiDiscord } from 'react-icons/si';
 
 const LoginForm = () => {

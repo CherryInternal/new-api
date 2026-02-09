@@ -29,9 +29,11 @@ import {
   getSystemName,
   setUserData,
   onDiscordOAuthClicked,
+  onGitHubOAuthClicked,
+  onLinuxDOOAuthClicked,
+  onOIDCClicked,
 } from '../../helpers';
 import Turnstile from 'react-turnstile';
-import { Button, Card, Checkbox, Divider, Form } from '@douyinfe/semi-ui';
 import {
   Button,
   Card,
@@ -51,11 +53,6 @@ import {
   IconKey,
 } from '@douyinfe/semi-icons';
 import OAuthButtons from './OAuthButtons';
-import {
-  onGitHubOAuthClicked,
-  onLinuxDOOAuthClicked,
-  onOIDCClicked,
-} from '../../helpers';
 import OIDCIcon from '../common/logo/OIDCIcon';
 import LinuxDoIcon from '../common/logo/LinuxDoIcon';
 import WeChatIcon from '../common/logo/WeChatIcon';
