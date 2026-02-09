@@ -8,6 +8,8 @@ import (
 )
 
 var defaultCacheRatio = map[string]float64{
+	"gemini-3-flash-preview":              0.25,
+	"gemini-3-pro-preview":                0.25,
 	"gpt-4":                               0.5,
 	"o1":                                  0.5,
 	"o1-2024-12-17":                       0.5,
@@ -43,6 +45,7 @@ var defaultCacheRatio = map[string]float64{
 	"claude-3-opus-20240229":              0.1,
 	"claude-3-haiku-20240307":             0.1,
 	"claude-3-5-haiku-20241022":           0.1,
+	"claude-haiku-4-5-20251001":           0.1,
 	"claude-3-5-sonnet-20240620":          0.1,
 	"claude-3-5-sonnet-20241022":          0.1,
 	"claude-3-7-sonnet-20250219":          0.1,
@@ -55,6 +58,14 @@ var defaultCacheRatio = map[string]float64{
 	"claude-opus-4-1-20250805-thinking":   0.1,
 	"claude-sonnet-4-5-20250929":          0.1,
 	"claude-sonnet-4-5-20250929-thinking": 0.1,
+	"claude-opus-4-5-20251101":            0.1,
+	"claude-opus-4-5-20251101-thinking":   0.1,
+	"claude-opus-4-6":                     0.1,
+	"claude-opus-4-6-thinking":            0.1,
+	"claude-opus-4-6-max":                 0.1,
+	"claude-opus-4-6-high":                0.1,
+	"claude-opus-4-6-medium":              0.1,
+	"claude-opus-4-6-low":                 0.1,
 }
 
 var defaultCreateCacheRatio = map[string]float64{
@@ -62,6 +73,7 @@ var defaultCreateCacheRatio = map[string]float64{
 	"claude-3-opus-20240229":              1.25,
 	"claude-3-haiku-20240307":             1.25,
 	"claude-3-5-haiku-20241022":           1.25,
+	"claude-haiku-4-5-20251001":           1.25,
 	"claude-3-5-sonnet-20240620":          1.25,
 	"claude-3-5-sonnet-20241022":          1.25,
 	"claude-3-7-sonnet-20250219":          1.25,
@@ -74,6 +86,14 @@ var defaultCreateCacheRatio = map[string]float64{
 	"claude-opus-4-1-20250805-thinking":   1.25,
 	"claude-sonnet-4-5-20250929":          1.25,
 	"claude-sonnet-4-5-20250929-thinking": 1.25,
+	"claude-opus-4-5-20251101":            1.25,
+	"claude-opus-4-5-20251101-thinking":   1.25,
+	"claude-opus-4-6":                     1.25,
+	"claude-opus-4-6-thinking":            1.25,
+	"claude-opus-4-6-max":                 1.25,
+	"claude-opus-4-6-high":                1.25,
+	"claude-opus-4-6-medium":              1.25,
+	"claude-opus-4-6-low":                 1.25,
 }
 
 //var defaultCreateCacheRatio = map[string]float64{}

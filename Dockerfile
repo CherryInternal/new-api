@@ -14,7 +14,7 @@ ENV GO111MODULE=on CGO_ENABLED=0
 ARG TARGETOS
 ARG TARGETARCH
 ENV GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64}
-
+ENV GOEXPERIMENT=greenteagc
 
 WORKDIR /build
 
@@ -27,11 +27,11 @@ RUN go build -ldflags "-s -w -X 'github.com/QuantumNous/new-api/common.Version=$
 
 FROM oryd/hydra:v25.4.0 AS hydra
 
-FROM alpine
+FROM debian:bookworm-slim
 
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
-    && apk upgrade --no-cache \
-    && apk add --no-cache ca-certificates tzdata \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates tzdata libasan8 wget \
+    && rm -rf /var/lib/apt/lists/* \
     && update-ca-certificates
 
 COPY --from=builder2 /build/new-api /

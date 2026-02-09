@@ -22,6 +22,27 @@ type GeminiChatRequest struct {
 	CachedContent      string                     `json:"cachedContent,omitempty"`
 }
 
+// UnmarshalJSON allows GeminiChatRequest to accept both snake_case and camelCase fields.
+func (r *GeminiChatRequest) UnmarshalJSON(data []byte) error {
+	type Alias GeminiChatRequest
+	var aux struct {
+		Alias
+		SystemInstructionSnake *GeminiChatContent `json:"system_instruction,omitempty"`
+	}
+
+	if err := common.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	*r = GeminiChatRequest(aux.Alias)
+
+	if aux.SystemInstructionSnake != nil {
+		r.SystemInstructions = aux.SystemInstructionSnake
+	}
+
+	return nil
+}
+
 type ToolConfig struct {
 	FunctionCallingConfig *FunctionCallingConfig `json:"functionCallingConfig,omitempty"`
 	RetrievalConfig       *RetrievalConfig       `json:"retrievalConfig,omitempty"`
@@ -43,6 +64,14 @@ type LatLng struct {
 	Longitude *float64 `json:"longitude,omitempty"`
 }
 
+// createGeminiFileSource 根据数据内容创建正确类型的 FileSource
+func createGeminiFileSource(data string, mimeType string) *types.FileSource {
+	if strings.HasPrefix(data, "http://") || strings.HasPrefix(data, "https://") {
+		return types.NewURLFileSource(data)
+	}
+	return types.NewBase64FileSource(data, mimeType)
+}
+
 func (r *GeminiChatRequest) GetTokenCountMeta() *types.TokenCountMeta {
 	var files []*types.FileMeta = make([]*types.FileMeta, 0)
 
@@ -59,27 +88,23 @@ func (r *GeminiChatRequest) GetTokenCountMeta() *types.TokenCountMeta {
 				inputTexts = append(inputTexts, part.Text)
 			}
 			if part.InlineData != nil && part.InlineData.Data != "" {
-				if strings.HasPrefix(part.InlineData.MimeType, "image/") {
-					files = append(files, &types.FileMeta{
-						FileType:   types.FileTypeImage,
-						OriginData: part.InlineData.Data,
-					})
-				} else if strings.HasPrefix(part.InlineData.MimeType, "audio/") {
-					files = append(files, &types.FileMeta{
-						FileType:   types.FileTypeAudio,
-						OriginData: part.InlineData.Data,
-					})
-				} else if strings.HasPrefix(part.InlineData.MimeType, "video/") {
-					files = append(files, &types.FileMeta{
-						FileType:   types.FileTypeVideo,
-						OriginData: part.InlineData.Data,
-					})
+				mimeType := part.InlineData.MimeType
+				source := createGeminiFileSource(part.InlineData.Data, mimeType)
+				var fileType types.FileType
+				if strings.HasPrefix(mimeType, "image/") {
+					fileType = types.FileTypeImage
+				} else if strings.HasPrefix(mimeType, "audio/") {
+					fileType = types.FileTypeAudio
+				} else if strings.HasPrefix(mimeType, "video/") {
+					fileType = types.FileTypeVideo
 				} else {
-					files = append(files, &types.FileMeta{
-						FileType:   types.FileTypeFile,
-						OriginData: part.InlineData.Data,
-					})
+					fileType = types.FileTypeFile
 				}
+				files = append(files, &types.FileMeta{
+					FileType: fileType,
+					Source:   source,
+					MimeType: mimeType,
+				})
 			}
 		}
 	}
@@ -105,7 +130,7 @@ func (r *GeminiChatRequest) SetModelName(modelName string) {
 
 func (r *GeminiChatRequest) GetTools() []GeminiChatTool {
 	var tools []GeminiChatTool
-	if strings.HasSuffix(string(r.Tools), "[") {
+	if strings.HasPrefix(string(r.Tools), "[") {
 		// is array
 		if err := common.Unmarshal(r.Tools, &tools); err != nil {
 			logger.LogError(nil, "error_unmarshalling_tools: "+err.Error())
@@ -142,7 +167,38 @@ type GeminiThinkingConfig struct {
 	IncludeThoughts bool `json:"includeThoughts,omitempty"`
 	ThinkingBudget  *int `json:"thinkingBudget,omitempty"`
 	// TODO Conflict with thinkingbudget.
-	// ThinkingLevel   json.RawMessage `json:"thinkingLevel,omitempty"`
+	ThinkingLevel string `json:"thinkingLevel,omitempty"`
+}
+
+// UnmarshalJSON allows GeminiThinkingConfig to accept both snake_case and camelCase fields.
+func (c *GeminiThinkingConfig) UnmarshalJSON(data []byte) error {
+	type Alias GeminiThinkingConfig
+	var aux struct {
+		Alias
+		IncludeThoughtsSnake *bool  `json:"include_thoughts,omitempty"`
+		ThinkingBudgetSnake  *int   `json:"thinking_budget,omitempty"`
+		ThinkingLevelSnake   string `json:"thinking_level,omitempty"`
+	}
+
+	if err := common.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	*c = GeminiThinkingConfig(aux.Alias)
+
+	if aux.IncludeThoughtsSnake != nil {
+		c.IncludeThoughts = *aux.IncludeThoughtsSnake
+	}
+
+	if aux.ThinkingBudgetSnake != nil {
+		c.ThinkingBudget = aux.ThinkingBudgetSnake
+	}
+
+	if aux.ThinkingLevelSnake != "" {
+		c.ThinkingLevel = aux.ThinkingLevelSnake
+	}
+
+	return nil
 }
 
 func (c *GeminiThinkingConfig) SetThinkingBudget(budget int) {
@@ -289,6 +345,88 @@ type GeminiChatGenerationConfig struct {
 	ImageConfig        json.RawMessage       `json:"imageConfig,omitempty"`  // RawMessage to allow flexible image config
 }
 
+// UnmarshalJSON allows GeminiChatGenerationConfig to accept both snake_case and camelCase fields.
+func (c *GeminiChatGenerationConfig) UnmarshalJSON(data []byte) error {
+	type Alias GeminiChatGenerationConfig
+	var aux struct {
+		Alias
+		TopPSnake               float64               `json:"top_p,omitempty"`
+		TopKSnake               float64               `json:"top_k,omitempty"`
+		MaxOutputTokensSnake    uint                  `json:"max_output_tokens,omitempty"`
+		CandidateCountSnake     int                   `json:"candidate_count,omitempty"`
+		StopSequencesSnake      []string              `json:"stop_sequences,omitempty"`
+		ResponseMimeTypeSnake   string                `json:"response_mime_type,omitempty"`
+		ResponseSchemaSnake     any                   `json:"response_schema,omitempty"`
+		ResponseJsonSchemaSnake json.RawMessage       `json:"response_json_schema,omitempty"`
+		PresencePenaltySnake    *float32              `json:"presence_penalty,omitempty"`
+		FrequencyPenaltySnake   *float32              `json:"frequency_penalty,omitempty"`
+		ResponseLogprobsSnake   bool                  `json:"response_logprobs,omitempty"`
+		MediaResolutionSnake    MediaResolution       `json:"media_resolution,omitempty"`
+		ResponseModalitiesSnake []string              `json:"response_modalities,omitempty"`
+		ThinkingConfigSnake     *GeminiThinkingConfig `json:"thinking_config,omitempty"`
+		SpeechConfigSnake       json.RawMessage       `json:"speech_config,omitempty"`
+		ImageConfigSnake        json.RawMessage       `json:"image_config,omitempty"`
+	}
+
+	if err := common.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	*c = GeminiChatGenerationConfig(aux.Alias)
+
+	// Prioritize snake_case if present
+	if aux.TopPSnake != 0 {
+		c.TopP = aux.TopPSnake
+	}
+	if aux.TopKSnake != 0 {
+		c.TopK = aux.TopKSnake
+	}
+	if aux.MaxOutputTokensSnake != 0 {
+		c.MaxOutputTokens = aux.MaxOutputTokensSnake
+	}
+	if aux.CandidateCountSnake != 0 {
+		c.CandidateCount = aux.CandidateCountSnake
+	}
+	if len(aux.StopSequencesSnake) > 0 {
+		c.StopSequences = aux.StopSequencesSnake
+	}
+	if aux.ResponseMimeTypeSnake != "" {
+		c.ResponseMimeType = aux.ResponseMimeTypeSnake
+	}
+	if aux.ResponseSchemaSnake != nil {
+		c.ResponseSchema = aux.ResponseSchemaSnake
+	}
+	if len(aux.ResponseJsonSchemaSnake) > 0 {
+		c.ResponseJsonSchema = aux.ResponseJsonSchemaSnake
+	}
+	if aux.PresencePenaltySnake != nil {
+		c.PresencePenalty = aux.PresencePenaltySnake
+	}
+	if aux.FrequencyPenaltySnake != nil {
+		c.FrequencyPenalty = aux.FrequencyPenaltySnake
+	}
+	if aux.ResponseLogprobsSnake {
+		c.ResponseLogprobs = aux.ResponseLogprobsSnake
+	}
+	if aux.MediaResolutionSnake != "" {
+		c.MediaResolution = aux.MediaResolutionSnake
+	}
+	if len(aux.ResponseModalitiesSnake) > 0 {
+		c.ResponseModalities = aux.ResponseModalitiesSnake
+	}
+	if aux.ThinkingConfigSnake != nil {
+		c.ThinkingConfig = aux.ThinkingConfigSnake
+	}
+	if len(aux.SpeechConfigSnake) > 0 {
+		c.SpeechConfig = aux.SpeechConfigSnake
+	}
+	if len(aux.ImageConfigSnake) > 0 {
+		c.ImageConfig = aux.ImageConfigSnake
+	}
+
+	return nil
+}
+
 type MediaResolution string
 
 type GeminiChatCandidate struct {
@@ -315,11 +453,12 @@ type GeminiChatResponse struct {
 }
 
 type GeminiUsageMetadata struct {
-	PromptTokenCount     int                         `json:"promptTokenCount"`
-	CandidatesTokenCount int                         `json:"candidatesTokenCount"`
-	TotalTokenCount      int                         `json:"totalTokenCount"`
-	ThoughtsTokenCount   int                         `json:"thoughtsTokenCount"`
-	PromptTokensDetails  []GeminiPromptTokensDetails `json:"promptTokensDetails"`
+	PromptTokenCount        int                         `json:"promptTokenCount"`
+	CandidatesTokenCount    int                         `json:"candidatesTokenCount"`
+	TotalTokenCount         int                         `json:"totalTokenCount"`
+	ThoughtsTokenCount      int                         `json:"thoughtsTokenCount"`
+	CachedContentTokenCount int                         `json:"cachedContentTokenCount"`
+	PromptTokensDetails     []GeminiPromptTokensDetails `json:"promptTokensDetails"`
 }
 
 type GeminiPromptTokensDetails struct {

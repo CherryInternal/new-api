@@ -11,6 +11,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
+	"github.com/QuantumNous/new-api/setting/model_setting"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
@@ -73,11 +74,17 @@ type ChannelMeta struct {
 	SupportStreamOptions bool // 是否支持流式选项
 }
 
+type TokenCountMeta struct {
+	//promptTokens int
+	estimatePromptTokens int
+}
+
 type RelayInfo struct {
 	TokenId           int
 	TokenKey          string
+	TokenGroup        string
 	UserId            int
-	UsingGroup        string // 使用的分组
+	UsingGroup        string // 使用的分组，当auto跨分组重试时，会变动
 	UserGroup         string // 用户所在分组
 	TokenUnlimited    bool
 	StartTime         time.Time
@@ -91,7 +98,6 @@ type RelayInfo struct {
 	RelayMode              int
 	OriginModelName        string
 	RequestURLPath         string
-	PromptTokens           int
 	ShouldIncludeUsage     bool
 	DisablePing            bool // 是否禁止向下游发送自定义 Ping
 	ClientWs               *websocket.Conn
@@ -107,14 +113,41 @@ type RelayInfo struct {
 	UserQuota              int
 	RelayFormat            types.RelayFormat
 	SendResponseCount      int
-	FinalPreConsumedQuota  int  // 最终预消耗的配额
-	IsClaudeBetaQuery      bool // /v1/messages?beta=true
+	ReceivedResponseCount  int
+	FinalPreConsumedQuota  int // 最终预消耗的配额
+	// Billing 是计费会话，封装了预扣费/结算/退款的统一生命周期。
+	// 免费模型和按次计费（MJ/Task）时为 nil。
+	Billing BillingSettler
+	// BillingSource indicates whether this request is billed from wallet quota or subscription.
+	// "" or "wallet" => wallet; "subscription" => subscription
+	BillingSource string
+	// SubscriptionId is the user_subscriptions.id used when BillingSource == "subscription"
+	SubscriptionId int
+	// SubscriptionPreConsumed is the amount pre-consumed on subscription item (quota units or 1)
+	SubscriptionPreConsumed int64
+	// SubscriptionPostDelta is the post-consume delta applied to amount_used (quota units; can be negative).
+	SubscriptionPostDelta int64
+	// SubscriptionPlanId / SubscriptionPlanTitle are used for logging/UI display.
+	SubscriptionPlanId    int
+	SubscriptionPlanTitle string
+	// RequestId is used for idempotent pre-consume/refund
+	RequestId string
+	// SubscriptionAmountTotal / SubscriptionAmountUsedAfterPreConsume are used to compute remaining in logs.
+	SubscriptionAmountTotal               int64
+	SubscriptionAmountUsedAfterPreConsume int64
+	IsClaudeBetaQuery                     bool // /v1/messages?beta=true
+	IsChannelTest                         bool // channel test request
 
 	PriceData types.PriceData
 
 	Request dto.Request
 
+	// RequestConversionChain records request format conversions in order, e.g.
+	// ["openai", "openai_responses"] or ["openai", "claude"].
+	RequestConversionChain []types.RelayFormat
+
 	ThinkingContentInfo
+	TokenCountMeta
 	*ClaudeConvertInfo
 	*RerankerInfo
 	*ResponsesUsageInfo
@@ -189,7 +222,7 @@ func (info *RelayInfo) ToString() string {
 	fmt.Fprintf(b, "IsPlayground: %t, ", info.IsPlayground)
 	fmt.Fprintf(b, "RequestURLPath: %q, ", info.RequestURLPath)
 	fmt.Fprintf(b, "OriginModelName: %q, ", info.OriginModelName)
-	fmt.Fprintf(b, "PromptTokens: %d, ", info.PromptTokens)
+	fmt.Fprintf(b, "EstimatePromptTokens: %d, ", info.estimatePromptTokens)
 	fmt.Fprintf(b, "ShouldIncludeUsage: %t, ", info.ShouldIncludeUsage)
 	fmt.Fprintf(b, "DisablePing: %t, ", info.DisablePing)
 	fmt.Fprintf(b, "SendResponseCount: %d, ", info.SendResponseCount)
@@ -266,6 +299,7 @@ var streamSupportedChannels = map[int]bool{
 	constant.ChannelTypeZhipu_v4:   true,
 	constant.ChannelTypeAli:        true,
 	constant.ChannelTypeSubmodel:   true,
+	constant.ChannelTypeCodex:      true,
 }
 
 func GenRelayInfoWs(c *gin.Context, ws *websocket.Conn) *RelayInfo {
@@ -368,6 +402,12 @@ func genBaseRelayInfo(c *gin.Context, request dto.Request) *RelayInfo {
 	//channelId := common.GetContextKeyInt(c, constant.ContextKeyChannelId)
 	//paramOverride := common.GetContextKeyStringMap(c, constant.ContextKeyChannelParamOverride)
 
+	tokenGroup := common.GetContextKeyString(c, constant.ContextKeyTokenGroup)
+	// 当令牌分组为空时，表示使用用户分组
+	if tokenGroup == "" {
+		tokenGroup = common.GetContextKeyString(c, constant.ContextKeyUserGroup)
+	}
+
 	startTime := common.GetContextKeyTime(c, constant.ContextKeyRequestStartTime)
 	if startTime.IsZero() {
 		startTime = time.Now()
@@ -381,9 +421,14 @@ func genBaseRelayInfo(c *gin.Context, request dto.Request) *RelayInfo {
 
 	// firstResponseTime = time.Now() - 1 second
 
+	reqId := common.GetContextKeyString(c, common.RequestIdKey)
+	if reqId == "" {
+		reqId = common.GetTimeString() + common.GetRandomString(8)
+	}
 	info := &RelayInfo{
 		Request: request,
 
+		RequestId:  reqId,
 		UserId:     common.GetContextKeyInt(c, constant.ContextKeyUserId),
 		UsingGroup: common.GetContextKeyString(c, constant.ContextKeyUsingGroup),
 		UserGroup:  common.GetContextKeyString(c, constant.ContextKeyUserGroup),
@@ -391,11 +436,11 @@ func genBaseRelayInfo(c *gin.Context, request dto.Request) *RelayInfo {
 		UserEmail:  common.GetContextKeyString(c, constant.ContextKeyUserEmail),
 
 		OriginModelName: common.GetContextKeyString(c, constant.ContextKeyOriginalModel),
-		PromptTokens:    common.GetContextKeyInt(c, constant.ContextKeyPromptTokens),
 
 		TokenId:        common.GetContextKeyInt(c, constant.ContextKeyTokenId),
 		TokenKey:       common.GetContextKeyString(c, constant.ContextKeyTokenKey),
 		TokenUnlimited: common.GetContextKeyBool(c, constant.ContextKeyTokenUnlimited),
+		TokenGroup:     tokenGroup,
 
 		isFirstResponse: true,
 		RelayMode:       relayconstant.Path2RelayMode(c.Request.URL.Path),
@@ -407,6 +452,10 @@ func genBaseRelayInfo(c *gin.Context, request dto.Request) *RelayInfo {
 		ThinkingContentInfo: ThinkingContentInfo{
 			IsFirstThinkingContent:  true,
 			SendLastThinkingContent: false,
+		},
+		TokenCountMeta: TokenCountMeta{
+			//promptTokens: common.GetContextKeyInt(c, constant.ContextKeyPromptTokens),
+			estimatePromptTokens: common.GetContextKeyInt(c, constant.ContextKeyEstimatedTokens),
 		},
 	}
 
@@ -429,42 +478,109 @@ func genBaseRelayInfo(c *gin.Context, request dto.Request) *RelayInfo {
 }
 
 func GenRelayInfo(c *gin.Context, relayFormat types.RelayFormat, request dto.Request, ws *websocket.Conn) (*RelayInfo, error) {
+	var info *RelayInfo
+	var err error
 	switch relayFormat {
 	case types.RelayFormatOpenAI:
-		return GenRelayInfoOpenAI(c, request), nil
+		info = GenRelayInfoOpenAI(c, request)
 	case types.RelayFormatOpenAIAudio:
-		return GenRelayInfoOpenAIAudio(c, request), nil
+		info = GenRelayInfoOpenAIAudio(c, request)
 	case types.RelayFormatOpenAIImage:
-		return GenRelayInfoImage(c, request), nil
+		info = GenRelayInfoImage(c, request)
 	case types.RelayFormatOpenAIRealtime:
-		return GenRelayInfoWs(c, ws), nil
+		info = GenRelayInfoWs(c, ws)
 	case types.RelayFormatClaude:
-		return GenRelayInfoClaude(c, request), nil
+		info = GenRelayInfoClaude(c, request)
 	case types.RelayFormatRerank:
 		if request, ok := request.(*dto.RerankRequest); ok {
-			return GenRelayInfoRerank(c, request), nil
+			info = GenRelayInfoRerank(c, request)
+			break
 		}
-		return nil, errors.New("request is not a RerankRequest")
+		err = errors.New("request is not a RerankRequest")
 	case types.RelayFormatGemini:
-		return GenRelayInfoGemini(c, request), nil
+		info = GenRelayInfoGemini(c, request)
 	case types.RelayFormatEmbedding:
-		return GenRelayInfoEmbedding(c, request), nil
+		info = GenRelayInfoEmbedding(c, request)
 	case types.RelayFormatOpenAIResponses:
 		if request, ok := request.(*dto.OpenAIResponsesRequest); ok {
-			return GenRelayInfoResponses(c, request), nil
+			info = GenRelayInfoResponses(c, request)
+			break
 		}
-		return nil, errors.New("request is not a OpenAIResponsesRequest")
+		err = errors.New("request is not a OpenAIResponsesRequest")
+	case types.RelayFormatOpenAIResponsesCompaction:
+		if request, ok := request.(*dto.OpenAIResponsesCompactionRequest); ok {
+			return GenRelayInfoResponsesCompaction(c, request), nil
+		}
+		return nil, errors.New("request is not a OpenAIResponsesCompactionRequest")
 	case types.RelayFormatTask:
-		return genBaseRelayInfo(c, nil), nil
+		info = genBaseRelayInfo(c, nil)
 	case types.RelayFormatMjProxy:
-		return genBaseRelayInfo(c, nil), nil
+		info = genBaseRelayInfo(c, nil)
 	default:
-		return nil, errors.New("invalid relay format")
+		err = errors.New("invalid relay format")
 	}
+
+	if err != nil {
+		return nil, err
+	}
+	if info == nil {
+		return nil, errors.New("failed to build relay info")
+	}
+
+	info.InitRequestConversionChain()
+	return info, nil
 }
 
-func (info *RelayInfo) SetPromptTokens(promptTokens int) {
-	info.PromptTokens = promptTokens
+func (info *RelayInfo) InitRequestConversionChain() {
+	if info == nil {
+		return
+	}
+	if len(info.RequestConversionChain) > 0 {
+		return
+	}
+	if info.RelayFormat == "" {
+		return
+	}
+	info.RequestConversionChain = []types.RelayFormat{info.RelayFormat}
+}
+
+func (info *RelayInfo) AppendRequestConversion(format types.RelayFormat) {
+	if info == nil {
+		return
+	}
+	if format == "" {
+		return
+	}
+	if len(info.RequestConversionChain) == 0 {
+		info.RequestConversionChain = []types.RelayFormat{format}
+		return
+	}
+	last := info.RequestConversionChain[len(info.RequestConversionChain)-1]
+	if last == format {
+		return
+	}
+	info.RequestConversionChain = append(info.RequestConversionChain, format)
+}
+
+func GenRelayInfoResponsesCompaction(c *gin.Context, request *dto.OpenAIResponsesCompactionRequest) *RelayInfo {
+	info := genBaseRelayInfo(c, request)
+	if info.RelayMode == relayconstant.RelayModeUnknown {
+		info.RelayMode = relayconstant.RelayModeResponsesCompact
+	}
+	info.RelayFormat = types.RelayFormatOpenAIResponsesCompaction
+	return info
+}
+
+//func (info *RelayInfo) SetPromptTokens(promptTokens int) {
+//	info.promptTokens = promptTokens
+//}
+
+func (info *RelayInfo) SetEstimatePromptTokens(promptTokens int) {
+	info.estimatePromptTokens = promptTokens
+}
+
+func (info *RelayInfo) GetEstimatePromptTokens() int {
+	return info.estimatePromptTokens
 }
 
 func (info *RelayInfo) SetFirstResponseTime() {
@@ -606,6 +722,50 @@ func RemoveDisabledFields(jsonData []byte, channelOtherSettings dto.ChannelOther
 	jsonDataAfter, err := common.Marshal(data)
 	if err != nil {
 		common.SysError("RemoveDisabledFields Marshal error :" + err.Error())
+		return jsonData, nil
+	}
+	return jsonDataAfter, nil
+}
+
+// RemoveGeminiDisabledFields removes disabled fields from Gemini request JSON data
+// Currently supports removing functionResponse.id field which Vertex AI does not support
+func RemoveGeminiDisabledFields(jsonData []byte) ([]byte, error) {
+	if !model_setting.GetGeminiSettings().RemoveFunctionResponseIdEnabled {
+		return jsonData, nil
+	}
+
+	var data map[string]interface{}
+	if err := common.Unmarshal(jsonData, &data); err != nil {
+		common.SysError("RemoveGeminiDisabledFields Unmarshal error: " + err.Error())
+		return jsonData, nil
+	}
+
+	// Process contents array
+	// Handle both camelCase (functionResponse) and snake_case (function_response)
+	if contents, ok := data["contents"].([]interface{}); ok {
+		for _, content := range contents {
+			if contentMap, ok := content.(map[string]interface{}); ok {
+				if parts, ok := contentMap["parts"].([]interface{}); ok {
+					for _, part := range parts {
+						if partMap, ok := part.(map[string]interface{}); ok {
+							// Check functionResponse (camelCase)
+							if funcResp, ok := partMap["functionResponse"].(map[string]interface{}); ok {
+								delete(funcResp, "id")
+							}
+							// Check function_response (snake_case)
+							if funcResp, ok := partMap["function_response"].(map[string]interface{}); ok {
+								delete(funcResp, "id")
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	jsonDataAfter, err := common.Marshal(data)
+	if err != nil {
+		common.SysError("RemoveGeminiDisabledFields Marshal error: " + err.Error())
 		return jsonData, nil
 	}
 	return jsonDataAfter, nil

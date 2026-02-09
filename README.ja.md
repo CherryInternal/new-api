@@ -7,8 +7,8 @@
 🍥 **次世代大規模モデルゲートウェイとAI資産管理システム**
 
 <p align="center">
-  <a href="./README.md">中文</a> | 
-  <a href="./README.en.md">English</a> | 
+  <a href="./README.zh.md">中文</a> | 
+  <a href="./README.md">English</a> | 
   <a href="./README.fr.md">Français</a> | 
   <strong>日本語</strong>
 </p>
@@ -34,6 +34,13 @@
 <p align="center">
   <a href="https://trendshift.io/repositories/8227" target="_blank">
     <img src="https://trendshift.io/api/badge/repositories/8227" alt="Calcium-Ion%2Fnew-api | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/>
+  </a>
+  <br>
+  <a href="https://hellogithub.com/repository/QuantumNous/new-api" target="_blank">
+    <img src="https://api.hellogithub.com/v1/widgets/recommend.svg?rid=539ac4217e69431684ad4a0bab768811&claim_uid=tbFPfKIDHpc4TzR" alt="Featured｜HelloGitHub" style="width: 250px; height: 54px;" width="250" height="54" />
+  </a>
+  <a href="https://www.producthunt.com/products/new-api/launches/new-api?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-new-api" target="_blank" rel="noopener noreferrer">
+    <img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1047693&theme=light&t=1769577875005" alt="New API - All-in-one AI asset management gateway. | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" />
   </a>
 </p>
 
@@ -146,7 +153,7 @@ docker run --name new-api -d --restart always \
 
 🎉 デプロイが完了したら、`http://localhost:3000` にアクセスして使用を開始してください！
 
-📖 その他のデプロイ方法については[デプロイガイド](https://docs.newapi.pro/installation)を参照してください。
+📖 その他のデプロイ方法については[デプロイガイド](https://docs.newapi.pro/ja/docs/installation)を参照してください。
 
 ---
 
@@ -154,7 +161,7 @@ docker run --name new-api -d --restart always \
 
 <div align="center">
 
-### 📖 [公式ドキュメント](https://docs.newapi.pro/) | [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/QuantumNous/new-api)
+### 📖 [公式ドキュメント](https://docs.newapi.pro/ja/docs) | [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/QuantumNous/new-api)
 
 </div>
 
@@ -162,17 +169,17 @@ docker run --name new-api -d --restart always \
 
 | カテゴリ | リンク |
 |------|------|
-| 🚀 デプロイガイド | [インストールドキュメント](https://docs.newapi.pro/installation) |
-| ⚙️ 環境設定 | [環境変数](https://docs.newapi.pro/installation/environment-variables) |
-| 📡 APIドキュメント | [APIドキュメント](https://docs.newapi.pro/api) |
-| ❓ よくある質問 | [FAQ](https://docs.newapi.pro/support/faq) |
-| 💬 コミュニティ交流 | [交流チャネル](https://docs.newapi.pro/support/community-interaction) |
+| 🚀 デプロイガイド | [インストールドキュメント](https://docs.newapi.pro/ja/docs/installation) |
+| ⚙️ 環境設定 | [環境変数](https://docs.newapi.pro/ja/docs/installation/config-maintenance/environment-variables) |
+| 📡 APIドキュメント | [APIドキュメント](https://docs.newapi.pro/ja/docs/api) |
+| ❓ よくある質問 | [FAQ](https://docs.newapi.pro/ja/docs/support/faq) |
+| 💬 コミュニティ交流 | [交流チャネル](https://docs.newapi.pro/ja/docs/support/community-interaction) |
 
 ---
 
 ## ✨ 主な機能
 
-> 詳細な機能については[機能説明](https://docs.newapi.pro/wiki/features-introduction)を参照してください。
+> 詳細な機能については[機能説明](https://docs.newapi.pro/ja/docs/guide/wiki/basic-concepts/features-introduction)を参照してください。
 
 ### 🎨 コア機能
 
@@ -193,24 +200,22 @@ docker run --name new-api -d --restart always \
 
 ### 🔐 認証とセキュリティ
 
+- 😈 Discord認証ログイン
 - 🤖 LinuxDO認証ログイン
 - 📱 Telegram認証ログイン
 - 🔑 OIDC統一認証
+- 🔍 Key使用量クォータ照会（[neko-api-key-tool](https://github.com/Calcium-Ion/neko-api-key-tool)と併用）
 
 
 
 ### 🚀 高度な機能
 
 **APIフォーマットサポート:**
-- ⚡ [OpenAI Responses](https://docs.newapi.pro/api/openai-responses)
-- ⚡ [OpenAI Realtime API](https://docs.newapi.pro/api/openai-realtime)（Azureを含む）
-- ⚡ [Claude Messages](https://docs.newapi.pro/api/anthropic-chat)
-- ⚡ [Google Gemini](https://docs.newapi.pro/api/google-gemini-chat/)
-- 🔄 [Rerankモデル](https://docs.newapi.pro/api/jinaai-rerank)
-- ⚡ [OpenAI Realtime API](https://docs.newapi.pro/api/openai-realtime)
-- ⚡ [Claude Messages](https://docs.newapi.pro/api/anthropic-chat)
-- ⚡ [Google Gemini](https://docs.newapi.pro/api/google-gemini-chat/)
-- 🔄 [Rerankモデル](https://docs.newapi.pro/api/jinaai-rerank)（Cohere、Jina）
+- ⚡ [OpenAI Responses](https://docs.newapi.pro/ja/docs/api/ai-model/chat/openai/create-response)
+- ⚡ [OpenAI Realtime API](https://docs.newapi.pro/ja/docs/api/ai-model/realtime/create-realtime-session)（Azureを含む）
+- ⚡ [Claude Messages](https://docs.newapi.pro/ja/docs/api/ai-model/chat/create-message)
+- ⚡ [Google Gemini](https://doc.newapi.pro/ja/api/google-gemini-chat)
+- 🔄 [Rerankモデル](https://docs.newapi.pro/ja/docs/api/ai-model/rerank/create-rerank)（Cohere、Jina）
 
 **インテリジェントルーティング:**
 - ⚖️ チャネル重み付けランダム
@@ -218,9 +223,11 @@ docker run --name new-api -d --restart always \
 - 🚦 ユーザーレベルモデルレート制限
 
 **フォーマット変換:**
-- 🔄 OpenAI ⇄ Claude Messages
-- 🔄 OpenAI ⇄ Gemini Chat
-- 🔄 思考からコンテンツへの機能
+- 🔄 **OpenAI Compatible ⇄ Claude Messages**
+- 🔄 **OpenAI Compatible → Google Gemini**
+- 🔄 **Google Gemini → OpenAI Compatible** - テキストのみ、関数呼び出しはまだサポートされていません
+- 🚧 **OpenAI Compatible ⇄ OpenAI Responses** - 開発中
+- 🔄 **思考からコンテンツへの機能**
 
 **Reasoning Effort サポート:**
 
@@ -243,6 +250,7 @@ docker run --name new-api -d --restart always \
 - `gemini-2.5-flash-nothinking` - 思考モードを無効にする
 - `gemini-2.5-pro-thinking` - 思考モードを有効にする
 - `gemini-2.5-pro-thinking-128` - 思考モードを有効にし、思考予算を128トークンに設定する
+- Gemini モデル名の末尾に `-low` / `-medium` / `-high` を付けることで推論強度を直接指定できます（追加の思考予算サフィックスは不要です）。
 
 </details>
 
@@ -250,16 +258,17 @@ docker run --name new-api -d --restart always \
 
 ## 🤖 モデルサポート
 
-> 詳細については[APIドキュメント - 中継インターフェース](https://docs.newapi.pro/api)
+> 詳細については[APIドキュメント - 中継インターフェース](https://docs.newapi.pro/ja/docs/api)
 
 | モデルタイプ | 説明 | ドキュメント |
 |---------|------|------|
-| 🤖 OpenAI GPTs | gpt-4-gizmo-* シリーズ | - |
-| 🎨 Midjourney-Proxy | [Midjourney-Proxy(Plus)](https://github.com/novicezk/midjourney-proxy) | [ドキュメント](https://docs.newapi.pro/api/midjourney-proxy-image) |
-| 🎵 Suno-API | [Suno API](https://github.com/Suno-API/Suno-API) | [ドキュメント](https://docs.newapi.pro/api/suno-music) |
-| 🔄 Rerank | Cohere、Jina | [ドキュメント](https://docs.newapi.pro/api/jinaai-rerank) |
-| 💬 Claude | Messagesフォーマット | [ドキュメント](https://docs.newapi.pro/api/suno-music) |
-| 🌐 Gemini | Google Geminiフォーマット | [ドキュメント](https://docs.newapi.pro/api/google-gemini-chat/) |
+| 🤖 OpenAI-Compatible | OpenAI互換モデル | [ドキュメント](https://docs.newapi.pro/ja/docs/api/ai-model/chat/openai/createchatcompletion) |
+| 🤖 OpenAI Responses | OpenAI Responsesフォーマット | [ドキュメント](https://docs.newapi.pro/ja/docs/api/ai-model/chat/openai/createresponse) |
+| 🎨 Midjourney-Proxy | [Midjourney-Proxy(Plus)](https://github.com/novicezk/midjourney-proxy) | [ドキュメント](https://doc.newapi.pro/api/midjourney-proxy-image) |
+| 🎵 Suno-API | [Suno API](https://github.com/Suno-API/Suno-API) | [ドキュメント](https://doc.newapi.pro/api/suno-music) |
+| 🔄 Rerank | Cohere、Jina | [ドキュメント](https://docs.newapi.pro/ja/docs/api/ai-model/rerank/creatererank) |
+| 💬 Claude | Messagesフォーマット | [ドキュメント](https://docs.newapi.pro/ja/docs/api/ai-model/chat/createmessage) |
+| 🌐 Gemini | Google Geminiフォーマット | [ドキュメント](https://docs.newapi.pro/ja/docs/api/ai-model/chat/gemini/geminirelayv1beta) |
 | 🔧 Dify | ChatFlowモード | - |
 | 🎯 カスタム | 完全な呼び出しアドレスの入力をサポート | - |
 
@@ -268,16 +277,16 @@ docker run --name new-api -d --restart always \
 <details>
 <summary>完全なインターフェースリストを表示</summary>
 
-- [チャットインターフェース (Chat Completions)](https://docs.newapi.pro/api/openai-chat)
-- [レスポンスインターフェース (Responses)](https://docs.newapi.pro/api/openai-responses)
-- [イメージインターフェース (Image)](https://docs.newapi.pro/api/openai-image)
-- [オーディオインターフェース (Audio)](https://docs.newapi.pro/api/openai-audio)
-- [ビデオインターフェース (Video)](https://docs.newapi.pro/api/openai-video)
-- [エンベッドインターフェース (Embeddings)](https://docs.newapi.pro/api/openai-embeddings)
-- [再ランク付けインターフェース (Rerank)](https://docs.newapi.pro/api/jinaai-rerank)
-- [リアルタイム対話インターフェース (Realtime)](https://docs.newapi.pro/api/openai-realtime)
-- [Claudeチャット](https://docs.newapi.pro/api/anthropic-chat)
-- [Google Geminiチャット](https://docs.newapi.pro/api/google-gemini-chat/)
+- [チャットインターフェース (Chat Completions)](https://docs.newapi.pro/ja/docs/api/ai-model/chat/openai/createchatcompletion)
+- [レスポンスインターフェース (Responses)](https://docs.newapi.pro/ja/docs/api/ai-model/chat/openai/createresponse)
+- [イメージインターフェース (Image)](https://docs.newapi.pro/ja/docs/api/ai-model/images/openai/post-v1-images-generations)
+- [オーディオインターフェース (Audio)](https://docs.newapi.pro/ja/docs/api/ai-model/audio/openai/create-transcription)
+- [ビデオインターフェース (Video)](https://docs.newapi.pro/ja/docs/api/ai-model/audio/openai/createspeech)
+- [エンベッドインターフェース (Embeddings)](https://docs.newapi.pro/ja/docs/api/ai-model/embeddings/createembedding)
+- [再ランク付けインターフェース (Rerank)](https://docs.newapi.pro/ja/docs/api/ai-model/rerank/creatererank)
+- [リアルタイム対話インターフェース (Realtime)](https://docs.newapi.pro/ja/docs/api/ai-model/realtime/createrealtimesession)
+- [Claudeチャット](https://docs.newapi.pro/ja/docs/api/ai-model/chat/createmessage)
+- [Google Geminiチャット](https://docs.newapi.pro/ja/docs/api/ai-model/chat/gemini/geminirelayv1beta)
 
 </details>
 
@@ -308,10 +317,19 @@ docker run --name new-api -d --restart always \
 | `SQL_DSN** | データベース接続文字列 | - |
 | `REDIS_CONN_STRING` | Redis接続文字列 | - |
 | `STREAMING_TIMEOUT` | ストリーミング応答のタイムアウト時間（秒） | `300` |
+| `STREAM_SCANNER_MAX_BUFFER_MB` | ストリームスキャナの1行あたりバッファ上限（MB）。4K画像など巨大なbase64 `data:` ペイロードを扱う場合は値を増加させてください | `64` |
+| `MAX_REQUEST_BODY_MB` | リクエストボディ最大サイズ（MB、**解凍後**に計測。巨大リクエスト/zip bomb によるメモリ枯渇を防止）。超過時は `413` | `32` |
 | `AZURE_DEFAULT_API_VERSION` | Azure APIバージョン | `2025-04-01-preview` |
 | `ERROR_LOG_ENABLED` | エラーログスイッチ | `false` |
+| `PYROSCOPE_URL` | Pyroscopeサーバーのアドレス | - |
+| `PYROSCOPE_APP_NAME` | Pyroscopeアプリ名 | `new-api` |
+| `PYROSCOPE_BASIC_AUTH_USER` | Pyroscope Basic Authユーザー | - |
+| `PYROSCOPE_BASIC_AUTH_PASSWORD` | Pyroscope Basic Authパスワード | - |
+| `PYROSCOPE_MUTEX_RATE` | Pyroscope mutexサンプリング率 | `5` |
+| `PYROSCOPE_BLOCK_RATE` | Pyroscope blockサンプリング率 | `5` |
+| `HOSTNAME` | Pyroscope用のホスト名タグ | `new-api` |
 
-📖 **完全な設定:** [環境変数ドキュメント](https://docs.newapi.pro/installation/environment-variables)
+📖 **完全な設定:** [環境変数ドキュメント](https://docs.newapi.pro/ja/docs/installation/config-maintenance/environment-variables)
 
 </details>
 
@@ -411,10 +429,10 @@ docker run --name new-api -d --restart always \
 
 | リソース | リンク |
 |------|------|
-| 📘 よくある質問 | [FAQ](https://docs.newapi.pro/support/faq) |
-| 💬 コミュニティ交流 | [交流チャネル](https://docs.newapi.pro/support/community-interaction) |
-| 🐛 問題のフィードバック | [問題フィードバック](https://docs.newapi.pro/support/feedback-issues) |
-| 📚 完全なドキュメント | [公式ドキュメント](https://docs.newapi.pro/support) |
+| 📘 よくある質問 | [FAQ](https://docs.newapi.pro/ja/docs/support/faq) |
+| 💬 コミュニティ交流 | [交流チャネル](https://docs.newapi.pro/ja/docs/support/community-interaction) |
+| 🐛 問題のフィードバック | [問題フィードバック](https://docs.newapi.pro/ja/docs/support/feedback-issues) |
+| 📚 完全なドキュメント | [公式ドキュメント](https://docs.newapi.pro/ja/docs) |
 
 ### 🤝 貢献ガイド
 
@@ -424,6 +442,14 @@ docker run --name new-api -d --restart always \
 - 💡 新しい機能を提案する
 - 📝 ドキュメントを改善する
 - 🔧 コードを提出する
+
+---
+
+## 📜 ライセンス
+
+このプロジェクトは [GNU Affero General Public License v3.0 (AGPLv3)](./LICENSE) の下でライセンスされています。
+
+お客様の組織のポリシーがAGPLv3ライセンスのソフトウェアの使用を許可していない場合、またはAGPLv3のオープンソース義務を回避したい場合は、こちらまでお問い合わせください：[support@quantumnous.com](mailto:support@quantumnous.com)
 
 ---
 
@@ -443,7 +469,7 @@ docker run --name new-api -d --restart always \
 
 このプロジェクトがあなたのお役に立てたなら、ぜひ ⭐️ スターをください！
 
-**[公式ドキュメント](https://docs.newapi.pro/)** • **[問題フィードバック](https://github.com/Calcium-Ion/new-api/issues)** • **[最新リリース](https://github.com/Calcium-Ion/new-api/releases)**
+**[公式ドキュメント](https://docs.newapi.pro/ja/docs)** • **[問題フィードバック](https://github.com/Calcium-Ion/new-api/issues)** • **[最新リリース](https://github.com/Calcium-Ion/new-api/releases)**
 
 <sub>❤️ で構築された QuantumNous</sub>
 
