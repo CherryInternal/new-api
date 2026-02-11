@@ -46,6 +46,7 @@ func GetPricing(c *gin.Context) {
 		"usable_group":       usableGroup,
 		"supported_endpoint": model.GetSupportedEndpointMap(),
 		"auto_groups":        service.GetUserAutoGroup(group),
+		"cache_ratio":        ratio_setting.GetCacheRatioMap(),
 	})
 }
 
