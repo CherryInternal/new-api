@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   API,
@@ -25,40 +25,89 @@ import {
   showError,
   showInfo,
   showSuccess,
+  updateAPI,
   getSystemName,
+  setUserData,
+  onDiscordOAuthClicked,
+  onGitHubOAuthClicked,
+  onLinuxDOOAuthClicked,
+  onOIDCClicked,
 } from '../../helpers';
 import Turnstile from 'react-turnstile';
-import { Button, Card, Checkbox, Divider, Form } from '@douyinfe/semi-ui';
+import {
+  Button,
+  Card,
+  Checkbox,
+  Divider,
+  Form,
+  Icon,
+  Modal,
+} from '@douyinfe/semi-ui';
 import Title from '@douyinfe/semi-ui/lib/es/typography/title';
 import Text from '@douyinfe/semi-ui/lib/es/typography/text';
-import { IconMail, IconUser, IconLock, IconKey } from '@douyinfe/semi-icons';
+import {
+  IconGithubLogo,
+  IconMail,
+  IconUser,
+  IconLock,
+  IconKey,
+} from '@douyinfe/semi-icons';
 import OAuthButtons from './OAuthButtons';
+import OIDCIcon from '../common/logo/OIDCIcon';
+import LinuxDoIcon from '../common/logo/LinuxDoIcon';
+import WeChatIcon from '../common/logo/WeChatIcon';
+import TelegramLoginButton from 'react-telegram-login/src';
+import { UserContext } from '../../context/User';
+import { StatusContext } from '../../context/Status';
 import { useTranslation } from 'react-i18next';
+import { SiDiscord } from 'react-icons/si';
 
 const RegisterForm = () => {
   let navigate = useNavigate();
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const loginChallenge = searchParams.get('login_challenge');
+  const githubButtonTextKeyByState = {
+    idle: '使用 GitHub 继续',
+    redirecting: '正在跳转 GitHub...',
+    timeout: '请求超时，请刷新页面后重新发起 GitHub 登录',
+  };
   const [inputs, setInputs] = useState({
     username: '',
     password: '',
     password2: '',
     email: '',
     verification_code: '',
+    wechat_verification_code: '',
   });
   const { username, password, password2 } = inputs;
+  const [userState, userDispatch] = useContext(UserContext);
+  const [statusState] = useContext(StatusContext);
   const [turnstileEnabled, setTurnstileEnabled] = useState(false);
   const [turnstileSiteKey, setTurnstileSiteKey] = useState('');
   const [turnstileToken, setTurnstileToken] = useState('');
+  const [showWeChatLoginModal, setShowWeChatLoginModal] = useState(false);
   const [showEmailRegister, setShowEmailRegister] = useState(false);
+  const [wechatLoading, setWechatLoading] = useState(false);
+  const [githubLoading, setGithubLoading] = useState(false);
+  const [discordLoading, setDiscordLoading] = useState(false);
+  const [oidcLoading, setOidcLoading] = useState(false);
+  const [linuxdoLoading, setLinuxdoLoading] = useState(false);
+  const [emailRegisterLoading, setEmailRegisterLoading] = useState(false);
   const [registerLoading, setRegisterLoading] = useState(false);
   const [verificationCodeLoading, setVerificationCodeLoading] = useState(false);
+  const [otherRegisterOptionsLoading, setOtherRegisterOptionsLoading] =
+    useState(false);
+  const [wechatCodeSubmitLoading, setWechatCodeSubmitLoading] = useState(false);
   const [disableButton, setDisableButton] = useState(false);
   const [countdown, setCountdown] = useState(30);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [hasUserAgreement, setHasUserAgreement] = useState(false);
   const [hasPrivacyPolicy, setHasPrivacyPolicy] = useState(false);
+  const [githubButtonState, setGithubButtonState] = useState('idle');
+  const [githubButtonDisabled, setGithubButtonDisabled] = useState(false);
+  const githubTimeoutRef = useRef(null);
+  const githubButtonText = t(githubButtonTextKeyByState[githubButtonState]);
 
   const logo = getLogo();
   const systemName = getSystemName();
@@ -68,25 +117,29 @@ const RegisterForm = () => {
     localStorage.setItem('aff', affCode);
   }
 
-  const [status] = useState(() => {
+  const status = useMemo(() => {
+    if (statusState?.status) return statusState.status;
     const savedStatus = localStorage.getItem('status');
-    return savedStatus ? JSON.parse(savedStatus) : {};
-  });
+    if (!savedStatus) return {};
+    try {
+      return JSON.parse(savedStatus) || {};
+    } catch (err) {
+      return {};
+    }
+  }, [statusState?.status]);
 
-  const [showEmailVerification, setShowEmailVerification] = useState(() => {
-    return status.email_verification ?? false;
-  });
+  const [showEmailVerification, setShowEmailVerification] = useState(false);
 
   useEffect(() => {
-    setShowEmailVerification(status.email_verification);
-    if (status.turnstile_check) {
+    setShowEmailVerification(!!status?.email_verification);
+    if (status?.turnstile_check) {
       setTurnstileEnabled(true);
       setTurnstileSiteKey(status.turnstile_site_key);
     }
 
     // 从 status 获取用户协议和隐私政策的启用状态
-    setHasUserAgreement(status.user_agreement_enabled || false);
-    setHasPrivacyPolicy(status.privacy_policy_enabled || false);
+    setHasUserAgreement(status?.user_agreement_enabled || false);
+    setHasPrivacyPolicy(status?.privacy_policy_enabled || false);
   }, [status]);
 
   // Check if user is already logged in during OAuth flow
@@ -124,6 +177,48 @@ const RegisterForm = () => {
     return () => clearInterval(countdownInterval); // Clean up on unmount
   }, [disableButton, countdown]);
 
+  useEffect(() => {
+    return () => {
+      if (githubTimeoutRef.current) {
+        clearTimeout(githubTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const onWeChatLoginClicked = () => {
+    setWechatLoading(true);
+    setShowWeChatLoginModal(true);
+    setWechatLoading(false);
+  };
+
+  const onSubmitWeChatVerificationCode = async () => {
+    if (turnstileEnabled && turnstileToken === '') {
+      showInfo('请稍后几秒重试，Turnstile 正在检查用户环境！');
+      return;
+    }
+    setWechatCodeSubmitLoading(true);
+    try {
+      const res = await API.get(
+        `/api/oauth/wechat?code=${inputs.wechat_verification_code}`,
+      );
+      const { success, message, data } = res.data;
+      if (success) {
+        userDispatch({ type: 'login', payload: data });
+        localStorage.setItem('user', JSON.stringify(data));
+        setUserData(data);
+        updateAPI();
+        navigate('/');
+        showSuccess('登录成功！');
+        setShowWeChatLoginModal(false);
+      } else {
+        showError(message);
+      }
+    } catch (error) {
+      showError('登录失败，请重试');
+    } finally {
+      setWechatCodeSubmitLoading(false);
+    }
+  };
 
   function handleChange(name, value) {
     setInputs((inputs) => ({ ...inputs, [name]: value }));
@@ -182,7 +277,7 @@ const RegisterForm = () => {
     setVerificationCodeLoading(true);
     try {
       const res = await API.get(
-        `/api/verification?email=${inputs.email}&turnstile=${turnstileToken}`,
+        `/api/verification?email=${encodeURIComponent(inputs.email)}&turnstile=${turnstileToken}`,
       );
       const { success, message } = res.data;
       if (success) {
@@ -198,8 +293,106 @@ const RegisterForm = () => {
     }
   };
 
+  const handleGitHubClick = () => {
+    if (githubButtonDisabled) {
+      return;
+    }
+    setGithubLoading(true);
+    setGithubButtonDisabled(true);
+    setGithubButtonState('redirecting');
+    if (githubTimeoutRef.current) {
+      clearTimeout(githubTimeoutRef.current);
+    }
+    githubTimeoutRef.current = setTimeout(() => {
+      setGithubLoading(false);
+      setGithubButtonState('timeout');
+      setGithubButtonDisabled(true);
+    }, 20000);
+    try {
+      onGitHubOAuthClicked(status.github_client_id, null, { shouldLogout: true });
+    } finally {
+      setTimeout(() => setGithubLoading(false), 3000);
+    }
+  };
+
+  const handleDiscordClick = () => {
+    setDiscordLoading(true);
+    try {
+      onDiscordOAuthClicked(status.discord_client_id, null, { shouldLogout: true });
+    } finally {
+      setTimeout(() => setDiscordLoading(false), 3000);
+    }
+  };
+
+  const handleOIDCClick = () => {
+    setOidcLoading(true);
+    try {
+      onOIDCClicked(
+        status.oidc_authorization_endpoint,
+        status.oidc_client_id,
+        false,
+        null,
+        { shouldLogout: true },
+      );
+    } finally {
+      setTimeout(() => setOidcLoading(false), 3000);
+    }
+  };
+
+  const handleLinuxDOClick = () => {
+    setLinuxdoLoading(true);
+    try {
+      onLinuxDOOAuthClicked(status.linuxdo_client_id, null, { shouldLogout: true });
+    } finally {
+      setTimeout(() => setLinuxdoLoading(false), 3000);
+    }
+  };
+
   const handleEmailRegisterClick = () => {
+    setEmailRegisterLoading(true);
     setShowEmailRegister(true);
+    setEmailRegisterLoading(false);
+  };
+
+  const handleOtherRegisterOptionsClick = () => {
+    setOtherRegisterOptionsLoading(true);
+    setShowEmailRegister(false);
+    setOtherRegisterOptionsLoading(false);
+  };
+
+  const onTelegramLoginClicked = async (response) => {
+    const fields = [
+      'id',
+      'first_name',
+      'last_name',
+      'username',
+      'photo_url',
+      'auth_date',
+      'hash',
+      'lang',
+    ];
+    const params = {};
+    fields.forEach((field) => {
+      if (response[field]) {
+        params[field] = response[field];
+      }
+    });
+    try {
+      const res = await API.get(`/api/oauth/telegram/login`, { params });
+      const { success, message, data } = res.data;
+      if (success) {
+        userDispatch({ type: 'login', payload: data });
+        localStorage.setItem('user', JSON.stringify(data));
+        showSuccess('登录成功！');
+        setUserData(data);
+        updateAPI();
+        navigate('/');
+      } else {
+        showError(message);
+      }
+    } catch (error) {
+      showError('登录失败，请重试');
+    }
   };
 
   const renderOAuthOptions = () => {
@@ -383,7 +576,9 @@ const RegisterForm = () => {
                     htmlType='submit'
                     onClick={handleSubmit}
                     loading={registerLoading}
-                    disabled={(hasUserAgreement || hasPrivacyPolicy) && !agreedToTerms}
+                    disabled={
+                      (hasUserAgreement || hasPrivacyPolicy) && !agreedToTerms
+                    }
                   >
                     {t('注册')}
                   </Button>
@@ -418,6 +613,45 @@ const RegisterForm = () => {
     );
   };
 
+  const renderWeChatLoginModal = () => {
+    return (
+      <Modal
+        title={t('微信扫码登录')}
+        visible={showWeChatLoginModal}
+        maskClosable={true}
+        onOk={onSubmitWeChatVerificationCode}
+        onCancel={() => setShowWeChatLoginModal(false)}
+        okText={t('登录')}
+        centered={true}
+        okButtonProps={{
+          loading: wechatCodeSubmitLoading,
+        }}
+      >
+        <div className='flex flex-col items-center'>
+          <img src={status.wechat_qrcode} alt='微信二维码' className='mb-4' />
+        </div>
+
+        <div className='text-center mb-4'>
+          <p>
+            {t('微信扫码关注公众号，输入「验证码」获取验证码（三分钟内有效）')}
+          </p>
+        </div>
+
+        <Form>
+          <Form.Input
+            field='wechat_verification_code'
+            placeholder={t('验证码')}
+            label={t('验证码')}
+            value={inputs.wechat_verification_code}
+            onChange={(value) =>
+              handleChange('wechat_verification_code', value)
+            }
+          />
+        </Form>
+      </Modal>
+    );
+  };
+
   return (
     <div className='relative overflow-hidden bg-gray-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8'>
       {/* 背景模糊晕染球 */}
@@ -433,6 +667,7 @@ const RegisterForm = () => {
         {showEmailRegister ||
         !(
           status.github_oauth ||
+          status.discord_oauth ||
           status.oidc_enabled ||
           status.wechat_login ||
           status.linuxdo_oauth ||

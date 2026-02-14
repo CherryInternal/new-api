@@ -17,15 +17,16 @@ import (
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/setting/model_setting"
+	"github.com/QuantumNous/new-api/setting/reasoning"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
 )
 
 const (
-	RequestModeClaude = 1
-	RequestModeGemini = 2
-	RequestModeLlama  = 3
+	RequestModeClaude     = 1
+	RequestModeGemini     = 2
+	RequestModeOpenSource = 3
 )
 
 var claudeModelMap = map[string]string{
@@ -39,6 +40,9 @@ var claudeModelMap = map[string]string{
 	"claude-opus-4-20250514":     "claude-opus-4@20250514",
 	"claude-opus-4-1-20250805":   "claude-opus-4-1@20250805",
 	"claude-sonnet-4-5-20250929": "claude-sonnet-4-5@20250929",
+	"claude-haiku-4-5-20251001":  "claude-haiku-4-5@20251001",
+	"claude-opus-4-5-20251101":   "claude-opus-4-5@20251101",
+	"claude-opus-4-6":            "claude-opus-4-6",
 }
 
 const anthropicVersion = "vertex-2023-10-16"
@@ -49,8 +53,41 @@ type Adaptor struct {
 }
 
 func (a *Adaptor) ConvertGeminiRequest(c *gin.Context, info *relaycommon.RelayInfo, request *dto.GeminiChatRequest) (any, error) {
+	// Vertex AI does not support functionResponse.id; keep it stripped here for consistency.
+	if model_setting.GetGeminiSettings().RemoveFunctionResponseIdEnabled {
+		removeFunctionResponseID(request)
+	}
 	geminiAdaptor := gemini.Adaptor{}
 	return geminiAdaptor.ConvertGeminiRequest(c, info, request)
+}
+
+func removeFunctionResponseID(request *dto.GeminiChatRequest) {
+	if request == nil {
+		return
+	}
+
+	if len(request.Contents) > 0 {
+		for i := range request.Contents {
+			if len(request.Contents[i].Parts) == 0 {
+				continue
+			}
+			for j := range request.Contents[i].Parts {
+				part := &request.Contents[i].Parts[j]
+				if part.FunctionResponse == nil {
+					continue
+				}
+				if len(part.FunctionResponse.ID) > 0 {
+					part.FunctionResponse.ID = nil
+				}
+			}
+		}
+	}
+
+	if len(request.Requests) > 0 {
+		for i := range request.Requests {
+			removeFunctionResponseID(&request.Requests[i])
+		}
+	}
 }
 
 func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, info *relaycommon.RelayInfo, request *dto.ClaudeRequest) (any, error) {
@@ -79,7 +116,7 @@ func (a *Adaptor) Init(info *relaycommon.RelayInfo) {
 	} else if strings.Contains(info.UpstreamModelName, "llama") ||
 		// open source models
 		strings.Contains(info.UpstreamModelName, "-maas") {
-		a.RequestMode = RequestModeLlama
+		a.RequestMode = RequestModeOpenSource
 	} else {
 		a.RequestMode = RequestModeGemini
 	}
@@ -130,10 +167,9 @@ func (a *Adaptor) getRequestUrl(info *relaycommon.RelayInfo, modelName, suffix s
 					suffix,
 				), nil
 			}
-		} else if a.RequestMode == RequestModeLlama {
+		} else if a.RequestMode == RequestModeOpenSource {
 			return fmt.Sprintf(
-				"https://%s-aiplatform.googleapis.com/v1beta1/projects/%s/locations/%s/endpoints/openapi/chat/completions",
-				region,
+				"https://aiplatform.googleapis.com/v1beta1/projects/%s/locations/%s/endpoints/openapi/chat/completions",
 				adc.ProjectID,
 				region,
 			), nil
@@ -180,6 +216,8 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 				info.UpstreamModelName = strings.TrimSuffix(info.UpstreamModelName, "-thinking")
 			} else if strings.HasSuffix(info.UpstreamModelName, "-nothinking") {
 				info.UpstreamModelName = strings.TrimSuffix(info.UpstreamModelName, "-nothinking")
+			} else if baseModel, level, ok := reasoning.TrimEffortSuffix(info.UpstreamModelName); ok && level != "" {
+				info.UpstreamModelName = baseModel
 			}
 		}
 
@@ -204,7 +242,7 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 			model = v
 		}
 		return a.getRequestUrl(info, model, suffix)
-	} else if a.RequestMode == RequestModeLlama {
+	} else if a.RequestMode == RequestModeOpenSource {
 		return a.getRequestUrl(info, "", "")
 	}
 	return "", errors.New("unsupported request mode")
@@ -302,7 +340,7 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 		}
 		c.Set("request_model", request.Model)
 		return geminiRequest, nil
-	} else if a.RequestMode == RequestModeLlama {
+	} else if a.RequestMode == RequestModeOpenSource {
 		return request, nil
 	}
 	return nil, errors.New("unsupported request mode")
@@ -330,20 +368,20 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 	if info.IsStream {
 		switch a.RequestMode {
 		case RequestModeClaude:
-			return claude.ClaudeStreamHandler(c, resp, info, claude.RequestModeMessage)
+			return claude.ClaudeStreamHandler(c, resp, info)
 		case RequestModeGemini:
 			if info.RelayMode == constant.RelayModeGemini {
 				return gemini.GeminiTextGenerationStreamHandler(c, info, resp)
 			} else {
 				return gemini.GeminiChatStreamHandler(c, info, resp)
 			}
-		case RequestModeLlama:
+		case RequestModeOpenSource:
 			return openai.OaiStreamHandler(c, info, resp)
 		}
 	} else {
 		switch a.RequestMode {
 		case RequestModeClaude:
-			return claude.ClaudeHandler(c, resp, info, claude.RequestModeMessage)
+			return claude.ClaudeHandler(c, resp, info)
 		case RequestModeGemini:
 			if info.RelayMode == constant.RelayModeGemini {
 				return gemini.GeminiTextGenerationHandler(c, info, resp)
@@ -353,7 +391,7 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 				}
 				return gemini.GeminiChatHandler(c, info, resp)
 			}
-		case RequestModeLlama:
+		case RequestModeOpenSource:
 			return openai.OpenaiHandler(c, info, resp)
 		}
 	}

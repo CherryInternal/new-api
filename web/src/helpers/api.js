@@ -236,8 +236,37 @@ export async function getOAuthState(loginChallenge = null) {
   }
 }
 
-export async function onOIDCClicked(auth_url, client_id, openInNewTab = false, loginChallenge = null) {
-  const state = await getOAuthState(loginChallenge);
+async function prepareOAuthState(loginChallenge = null, options = {}) {
+  const { shouldLogout = false } = options || {};
+  if (shouldLogout) {
+    try {
+      await API.get('/api/user/logout', { skipErrorHandler: true });
+    } catch (err) {}
+    localStorage.removeItem('user');
+    updateAPI();
+  }
+  return await getOAuthState();
+}
+
+export async function onDiscordOAuthClicked(client_id, loginChallenge = null, options = {}) {
+  const state = await prepareOAuthState(loginChallenge, options);
+  if (!state) return;
+  const redirect_uri = `${window.location.origin}/oauth/discord`;
+  const response_type = 'code';
+  const scope = 'identify+openid';
+  window.open(
+    `https://discord.com/oauth2/authorize?client_id=${client_id}&redirect_uri=${redirect_uri}&response_type=${response_type}&scope=${scope}&state=${state}`,
+  );
+}
+
+export async function onOIDCClicked(
+  auth_url,
+  client_id,
+  openInNewTab = false,
+  loginChallenge = null,
+  options = {},
+) {
+  const state = await prepareOAuthState(loginChallenge, options);
   if (!state) return;
   const url = new URL(auth_url);
   url.searchParams.set('client_id', client_id);
@@ -252,20 +281,67 @@ export async function onOIDCClicked(auth_url, client_id, openInNewTab = false, l
   }
 }
 
-export async function onGitHubOAuthClicked(github_client_id, loginChallenge = null) {
-  const state = await getOAuthState(loginChallenge);
+export async function onGitHubOAuthClicked(github_client_id, loginChallenge = null, options = {}) {
+  const state = await prepareOAuthState(loginChallenge, options);
   if (!state) return;
   window.open(
     `https://github.com/login/oauth/authorize?client_id=${github_client_id}&state=${state}&scope=user:email`,
   );
 }
 
-export async function onLinuxDOOAuthClicked(linuxdo_client_id, loginChallenge = null) {
-  const state = await getOAuthState(loginChallenge);
+export async function onLinuxDOOAuthClicked(
+  linuxdo_client_id,
+  loginChallenge = null,
+  options = { shouldLogout: false },
+) {
+  const state = await prepareOAuthState(loginChallenge, options);
   if (!state) return;
   window.open(
     `https://connect.linux.do/oauth2/authorize?response_type=code&client_id=${linuxdo_client_id}&state=${state}`,
   );
+}
+
+/**
+ * Initiate custom OAuth login
+ * @param {Object} provider - Custom OAuth provider config from status API
+ * @param {string} provider.slug - Provider slug (used for callback URL)
+ * @param {string} provider.client_id - OAuth client ID
+ * @param {string} provider.authorization_endpoint - Authorization URL
+ * @param {string} provider.scopes - OAuth scopes (space-separated)
+ * @param {string|null} loginChallenge - Hydra login challenge
+ * @param {Object} options - Options
+ * @param {boolean} options.shouldLogout - Whether to logout first
+ */
+export async function onCustomOAuthClicked(provider, loginChallenge = null, options = {}) {
+  const state = await prepareOAuthState(loginChallenge, options);
+  if (!state) return;
+
+  try {
+    const redirect_uri = `${window.location.origin}/oauth/${provider.slug}`;
+
+    // Check if authorization_endpoint is a full URL or relative path
+    let authUrl;
+    if (provider.authorization_endpoint.startsWith('http://') ||
+        provider.authorization_endpoint.startsWith('https://')) {
+      authUrl = new URL(provider.authorization_endpoint);
+    } else {
+      // Relative path - this is a configuration error, show error message
+      console.error('Custom OAuth authorization_endpoint must be a full URL:', provider.authorization_endpoint);
+      showError('OAuth 配置错误：授权端点必须是完整的 URL（以 http:// 或 https:// 开头）');
+      return;
+    }
+
+    authUrl.searchParams.set('client_id', provider.client_id);
+    authUrl.searchParams.set('redirect_uri', redirect_uri);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('scope', provider.scopes || 'openid profile email');
+    authUrl.searchParams.set('state', state);
+
+    window.open(authUrl.toString());
+  } catch (error) {
+    console.error('Failed to initiate custom OAuth:', error);
+    showError('OAuth 登录失败：' + (error.message || '未知错误'));
+  }
 }
 
 let channelModels = undefined;

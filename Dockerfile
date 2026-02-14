@@ -14,7 +14,7 @@ ENV GO111MODULE=on CGO_ENABLED=0
 ARG TARGETOS
 ARG TARGETARCH
 ENV GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64}
-
+ENV GOEXPERIMENT=greenteagc
 
 WORKDIR /build
 
@@ -25,17 +25,29 @@ COPY . .
 COPY --from=builder /build/dist ./web/dist
 RUN go build -ldflags "-s -w -X 'github.com/QuantumNous/new-api/common.Version=$(cat VERSION)'" -o new-api
 
-FROM oryd/hydra:v25.4.0 AS hydra
+FROM debian:bookworm-slim
 
-FROM alpine
+ARG TARGETOS
+ARG TARGETARCH
+ENV HYDRA_VERSION=v25.4.0
 
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
-    && apk upgrade --no-cache \
-    && apk add --no-cache ca-certificates tzdata \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates tzdata libasan8 wget \
+    && rm -rf /var/lib/apt/lists/* \
     && update-ca-certificates
 
+# Download hydra binary from GitHub releases (glibc compatible)
+RUN ARCH=$(case "${TARGETARCH:-amd64}" in \
+        amd64) echo "64bit" ;; \
+        arm64) echo "arm64" ;; \
+        *) echo "64bit" ;; \
+    esac) && \
+    wget -q "https://github.com/ory/hydra/releases/download/${HYDRA_VERSION}/hydra_${HYDRA_VERSION#v}-linux_${ARCH}.tar.gz" -O /tmp/hydra.tar.gz && \
+    tar -xzf /tmp/hydra.tar.gz -C /usr/bin hydra && \
+    chmod +x /usr/bin/hydra && \
+    rm /tmp/hydra.tar.gz
+
 COPY --from=builder2 /build/new-api /
-COPY --from=hydra /usr/bin/hydra /usr/bin/hydra
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 EXPOSE 3000
